@@ -347,7 +347,7 @@ Router.register('/daily', async () => {
         <div class="card">
             <div class="card-title">Buy Signals</div>
             <div class="card-value positive">${scan.actionable || 0}</div>
-            <div class="card-subtitle">Score ≥ 75</div>
+            <div class="card-subtitle">Score ≥ 70</div>
         </div>
         <div class="card">
             <div class="card-title">Top Pick</div>
@@ -569,6 +569,7 @@ async function renderStockDetail(symbol) {
         { label: 'Fundamental', value: scores.fundamental?.value?.toFixed(0), weight: scores.fundamental?.weight, class: 'fundamental' },
         { label: 'Momentum', value: scores.momentum?.value?.toFixed(0), weight: scores.momentum?.weight, class: 'momentum' },
         { label: 'News', value: scores.news?.value?.toFixed(0), weight: scores.news?.weight, class: 'news' },
+        { label: 'Strategy', value: scores.strategy?.value?.toFixed(0), weight: scores.strategy?.weight, class: 'strategy' },
     ];
 
     const flowHtml = stages.map(s => `
@@ -606,11 +607,19 @@ async function renderStockDetail(symbol) {
         </div>
         <div class="card">
             <div class="card-title">Current Price</div>
-            <div class="card-value neutral">$${data.current_price?.toFixed(2)}</div>
+            <div class="card-value neutral">$${data.current_price?.toFixed(2) || '—'}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Buy Price</div>
+            <div class="card-value neutral">$${data.buy_price?.toFixed(2) || '—'}</div>
         </div>
         <div class="card">
             <div class="card-title">Target (Short)</div>
             <div class="card-value positive">$${data.target_short?.toFixed(2) || '—'}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Target (Long)</div>
+            <div class="card-value positive">$${data.target_long?.toFixed(2) || '—'}</div>
         </div>
         <div class="card">
             <div class="card-title">Stop Loss</div>
