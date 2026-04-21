@@ -313,6 +313,44 @@ Router.register('/performance', async () => {
         </div>`;
     }
 
+    // Strategy leaderboard
+    const strategies = data.strategies || [];
+    let strategyHtml = '';
+    if (strategies.length > 0) {
+        const trendIcon = t => t === 'improving' ? '↑' : (t === 'declining' ? '↓' : '→');
+        const trendColor = t => t === 'improving' ? 'var(--accent-green)' : (t === 'declining' ? 'var(--accent-red)' : 'var(--text-secondary)');
+        strategyHtml = `
+        <div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Strategy Leaderboard</div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th><th>Strategy</th><th>Hit Rate (7d)</th>
+                        <th>Avg Return (7d)</th><th>Avg Return (1d)</th>
+                        <th>Picks</th><th>Trend</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${strategies.map((s, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td><strong>${s.name}</strong></td>
+                        <td>
+                            <div class="weight-bar" style="width:80px;display:inline-block;vertical-align:middle;margin-right:6px">
+                                <div class="weight-bar-fill ${s.hit_rate_7d >= 0.5 ? 'technical' : 'news'}" style="width:${(s.hit_rate_7d * 100).toFixed(0)}%"></div>
+                            </div>
+                            ${(s.hit_rate_7d * 100).toFixed(0)}%
+                        </td>
+                        <td class="${pctClass(s.avg_return_7d)}">${pctSign(s.avg_return_7d)}</td>
+                        <td class="${pctClass(s.avg_return_1d)}">${pctSign(s.avg_return_1d)}</td>
+                        <td>${s.total_picks}</td>
+                        <td style="color:${trendColor(s.trend)}">${trendIcon(s.trend)} ${s.trend}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+    }
+
     return `
     <div class="page-title">Performance</div>
     ${modelHtml || scorerHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">ML Model Metrics</div>' : ''}
@@ -320,6 +358,7 @@ Router.register('/performance', async () => {
         ${modelHtml}
         ${scorerHtml}
     </div>
+    ${strategyHtml}
     ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
     <div class="card-grid">
         ${hasScorecardData ? `
