@@ -14,7 +14,6 @@ const API = {
 
     async fetch(path, opts = {}) {
         const resp = await fetch(`${this.base}/api/${path}`, {
-            credentials: 'include',
             headers: this.headers(),
             ...opts,
         });
@@ -39,7 +38,6 @@ const API = {
     async checkAuth() {
         try {
             const resp = await fetch(`${this.base}/api/dashboard/auth/me`, {
-                credentials: 'include',
                 headers: this.headers(),
             });
             if (resp.ok) return resp.json();
@@ -49,7 +47,7 @@ const API = {
 
     async logout() {
         await fetch(`${this.base}/api/dashboard/auth/logout`, {
-            method: 'POST', credentials: 'include', headers: this.headers(),
+            method: 'POST', headers: this.headers(),
         });
         this.token = '';
         localStorage.removeItem('session_token');
