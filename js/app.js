@@ -86,7 +86,7 @@ Router.register('/login', async () => {
             try {
                 const result = await API.login(email);
                 msg.className = 'login-message';
-                msg.textContent = '✉️ Check your email for a login link!';
+                msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email for a login link';
             } catch (e) {
                 msg.className = 'login-message login-error';
                 msg.textContent = 'Failed to send. Try again.';
@@ -99,13 +99,17 @@ Router.register('/login', async () => {
     return `
     <div class="login-container">
         <div class="login-box">
-            <h1>📊 StockAnalysis</h1>
-            <p>Enter your email to receive a login link</p>
+            <div class="login-logo">
+                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <h1>StockAnalysis</h1>
+            <p>Sign in with a magic link sent to your email</p>
             <form id="login-form">
-                <input type="email" id="login-email" class="login-input" placeholder="your@email.com" required />
-                <button type="submit" id="login-btn" class="btn btn-primary">Send Login Link</button>
+                <input type="email" id="login-email" class="login-input" placeholder="you@example.com" required />
+                <button type="submit" id="login-btn" class="btn btn-primary">Continue with Email</button>
             </form>
             <div id="login-msg" class="login-message"></div>
+            <div class="login-footer">Secured with token-based authentication</div>
         </div>
     </div>`;
 });
@@ -118,8 +122,9 @@ Router.register('/daily', async () => {
 
     const scan = data.scan || {};
     const training = data.training || {};
+    const model = data.model || {};
 
-    let picksHtml = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
+    let picksHtml = '';
     if (scan.top_picks && scan.top_picks.length > 0) {
         picksHtml = scan.top_picks.map(p => `
             <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="cursor:pointer">
@@ -131,6 +136,26 @@ Router.register('/daily', async () => {
                 <td>${(p.signals || []).slice(0, 3).join(', ') || '—'}</td>
             </tr>
         `).join('');
+    } else if (scan.stocks_scanned) {
+        picksHtml = `<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">
+            No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
+        </td></tr>`;
+    } else {
+        picksHtml = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
+    }
+
+    // Training status section
+    let trainingHtml = '';
+    if (training.action || training.trained_at) {
+        const statusColor = training.action === 'failed' ? 'negative' : 'positive';
+        trainingHtml = `
+        <div class="card">
+            <div class="card-title">Training Status</div>
+            <div class="card-value ${statusColor}">${training.action || '—'}</div>
+            <div class="card-subtitle">${timeSince(training.trained_at)}</div>
+            ${training.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">${training.training_samples} training samples</div>` : ''}
+            ${training.budget_tier ? `<div style="font-size:13px;color:var(--text-secondary)">Budget: ${training.budget_tier} (headroom: $${training.budget_headroom?.toFixed(2) || '?'})</div>` : ''}
+        </div>`;
     }
 
     return `
@@ -141,6 +166,7 @@ Router.register('/daily', async () => {
             <div class="card-title">Stocks Scanned</div>
             <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
             <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
+            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary)">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
         </div>
         <div class="card">
             <div class="card-title">Buy Signals</div>
@@ -154,9 +180,10 @@ Router.register('/daily', async () => {
         </div>
         <div class="card">
             <div class="card-title">ML Model</div>
-            <div class="card-value neutral">${training.model_version || '—'}</div>
-            <div class="card-subtitle">${timeSince(training.last_retrain)}</div>
+            <div class="card-value neutral">${model.version || training.model_version || '—'}</div>
+            <div class="card-subtitle">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
         </div>
+        ${trainingHtml}
     </div>
 
     <div class="table-container">
