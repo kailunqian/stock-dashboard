@@ -12,6 +12,12 @@
     --accent-blue: #58a6ff;
     --accent-yellow: #d29922;
     --accent-purple: #bc8cff;
+    --green: #3fb950;
+    --green-bg: rgba(63,185,80,0.15);
+    --yellow: #d29922;
+    --yellow-bg: rgba(210,153,34,0.15);
+    --red: #f85149;
+    --red-bg: rgba(248,81,73,0.15);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -496,6 +502,7 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
     .nav-links a { padding: 6px 10px; font-size: 13px; }
     .main { padding: 16px; }
     .card-grid { grid-template-columns: 1fr; }
+    .hide-mobile { display: none; }
 }
 
 /* ── Analysis Pipeline — compact card-grid flow ─────────────────── */

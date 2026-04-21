@@ -64,6 +64,19 @@ function recPill(rec) {
     return pill(rec, map[rec] || 'blue');
 }
 
+function scoreBar(p) {
+    const items = [
+        { label: 'T', val: p.technical, color: '#4fc3f7' },
+        { label: 'F', val: p.fundamental, color: '#81c784' },
+        { label: 'M', val: p.momentum, color: '#ffb74d' },
+        { label: 'N', val: p.news, color: '#ce93d8' },
+        { label: 'S', val: p.strategy, color: '#f06292' },
+    ];
+    return items.filter(i => i.val != null).map(i =>
+        `<span title="${i.label}: ${i.val?.toFixed(0)}" style="display:inline-block;width:18px;height:12px;background:${i.color};opacity:${Math.max(0.3, (i.val||0)/100)};border-radius:2px;margin-right:1px"></span>`
+    ).join('') + `<span style="font-size:11px;color:var(--text-secondary);margin-left:3px">${items.map(i=>(i.val||0).toFixed(0)).join('/')}</span>`;
+}
+
 function renderConvictionTracker(conviction) {
     if (!conviction || conviction.length === 0) return '';
     const rows = conviction.slice(0, 10).map(c => {
@@ -154,24 +167,47 @@ Router.register('/daily', async () => {
     const training = data.training || {};
     const model = data.model || {};
 
+    // Build unified picks table merging today's scan + 30-day conviction
+    const conviction = data.conviction || [];
+    const convMap = {};
+    conviction.forEach(c => { convMap[c.symbol] = c; });
+
     let picksHtml = '';
     if (scan.top_picks && scan.top_picks.length > 0) {
-        picksHtml = scan.top_picks.map(p => `
-            <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="cursor:pointer">
-                <td><strong>${p.symbol}</strong></td>
-                <td>${recPill(p.recommendation)}</td>
+        // Merge today's picks with conviction history
+        const mergedPicks = scan.top_picks.map(p => {
+            const c = convMap[p.symbol];
+            return { ...p, conv: c || null };
+        });
+        // Add conviction-only stocks not in today's scan (tracked ≥3 days, avg ≥70)
+        conviction.filter(c => !scan.top_picks.some(p => p.symbol === c.symbol) && c.appearances >= 3 && c.avg_score >= 70)
+            .slice(0, 5)
+            .forEach(c => mergedPicks.push({ symbol: c.symbol, score: c.latest_score, conviction_only: true, conv: c }));
+
+        picksHtml = mergedPicks.map(p => {
+            const c = p.conv;
+            const convBadge = c ? `<span title="${c.appearances}d tracked, ${c.high_count}× strong" style="font-size:11px;padding:2px 5px;border-radius:8px;background:${c.avg_score>=75?'var(--green-bg)':c.avg_score>=60?'var(--yellow-bg)':'var(--red-bg)'};color:${c.avg_score>=75?'var(--green)':c.avg_score>=60?'var(--yellow)':'var(--red)'}">${c.avg_score}avg · ${c.high_count}× · ${c.trend === 'up' ? '📈' : c.trend === 'down' ? '📉' : '➡️'}</span>` : '<span style="font-size:11px;color:var(--text-secondary)">new</span>';
+            const rowStyle = p.conviction_only ? 'opacity:0.7;font-style:italic' : 'cursor:pointer';
+            const tag = p.conviction_only ? '<span style="font-size:10px;color:var(--text-secondary)"> (watch)</span>' : '';
+            return `
+            <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="${rowStyle}">
+                <td><strong>${p.symbol}</strong>${tag}</td>
+                <td>${p.recommendation ? recPill(p.recommendation) : pill('Track', 'blue')}</td>
                 <td>${p.score?.toFixed(0) || '—'}</td>
-                <td>$${p.current_price?.toFixed(2) || '—'}</td>
-                <td>$${p.target_short?.toFixed(2) || '—'}</td>
-                <td>${(p.signals || []).slice(0, 3).join(', ') || '—'}</td>
-            </tr>
-        `).join('');
+                <td>${p.current_price ? '$' + p.current_price.toFixed(2) : '—'}</td>
+                <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : '—'}</td>
+                <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
+                <td class="hide-mobile">${convBadge}</td>
+                <td class="hide-mobile">${scoreBar(p)}</td>
+                <td>${(p.signals || []).slice(0, 2).join(', ') || '—'}</td>
+            </tr>`;
+        }).join('');
     } else if (scan.stocks_scanned) {
-        picksHtml = `<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">
+        picksHtml = `<tr><td colspan="9" style="text-align:center;color:var(--text-secondary)">
             No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
         </td></tr>`;
     } else {
-        picksHtml = '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
+        picksHtml = '<tr><td colspan="9" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
     }
 
     // Training status section
@@ -326,15 +362,14 @@ Router.register('/daily', async () => {
         ${trainingHtml}
     </div>
 
-    ${renderConvictionTracker(data.conviction || [])}
-
     <div class="table-container">
-        <div class="table-header">Today's Recommendations</div>
+        <div class="table-header">Today's Picks + 30-Day Track Record</div>
         <table>
             <thead>
                 <tr>
                     <th>Symbol</th><th>Rating</th><th>Score</th>
-                    <th>Price</th><th>Target</th><th>Signals</th>
+                    <th>Price</th><th>Buy At</th><th>Target</th>
+                    <th class="hide-mobile">30d Record</th><th class="hide-mobile">Breakdown</th><th>Signals</th>
                 </tr>
             </thead>
             <tbody>${picksHtml}</tbody>
