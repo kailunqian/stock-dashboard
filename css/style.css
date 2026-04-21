@@ -37,11 +37,25 @@ body {
 }
 
 .nav-brand {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent-blue);
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
     margin-right: 32px;
     text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    letter-spacing: -0.3px;
+}
+
+.nav-logo {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: var(--accent-blue);
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
 .nav-links { display: flex; gap: 4px; flex: 1; }

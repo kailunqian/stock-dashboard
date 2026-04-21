@@ -159,7 +159,7 @@ Router.register('/daily', async () => {
     }
 
     return `
-    <div class="page-title">📊 Daily Report</div>
+    <div class="page-title">Daily Report</div>
 
     <div class="card-grid">
         <div class="card">
@@ -208,6 +208,9 @@ Router.register('/performance', async () => {
 
     const sc = data.scorecard?.scorecards || {};
     const card = sc.all || sc['30d'] || {};
+    const mm = data.model_metrics || {};
+    const scorer = data.scorer_state || {};
+    const scorerCard = scorer.scorecard || {};
 
     function scorecardCard(period, c) {
         if (!c || c.total_picks === 0) return '';
@@ -233,29 +236,98 @@ Router.register('/performance', async () => {
             <div class="card-title">Confidence Calibration</div>
             ${allCard.strong_buy_count > 0 ? `
             <div class="weight-bar-container">
-                <div class="weight-bar-label"><span>🟢🟢 Strong Buy</span><span>${(allCard.strong_buy_hit_rate*100).toFixed(0)}% (${allCard.strong_buy_count})</span></div>
+                <div class="weight-bar-label"><span>Strong Buy</span><span>${(allCard.strong_buy_hit_rate*100).toFixed(0)}% (${allCard.strong_buy_count})</span></div>
                 <div class="weight-bar"><div class="weight-bar-fill technical" style="width:${allCard.strong_buy_hit_rate*100}%"></div></div>
             </div>` : ''}
             ${allCard.buy_count > 0 ? `
             <div class="weight-bar-container">
-                <div class="weight-bar-label"><span>🟢 Buy</span><span>${(allCard.buy_hit_rate*100).toFixed(0)}% (${allCard.buy_count})</span></div>
+                <div class="weight-bar-label"><span>Buy</span><span>${(allCard.buy_hit_rate*100).toFixed(0)}% (${allCard.buy_count})</span></div>
                 <div class="weight-bar"><div class="weight-bar-fill fundamental" style="width:${allCard.buy_hit_rate*100}%"></div></div>
             </div>` : ''}
             ${allCard.high_conf_picks > 0 ? `
             <div class="weight-bar-container">
-                <div class="weight-bar-label"><span>🎯 High Conf (≥75)</span><span>${(allCard.high_conf_hit_rate*100).toFixed(0)}% (${allCard.high_conf_picks})</span></div>
+                <div class="weight-bar-label"><span>High Conf (≥75)</span><span>${(allCard.high_conf_hit_rate*100).toFixed(0)}% (${allCard.high_conf_picks})</span></div>
                 <div class="weight-bar"><div class="weight-bar-fill momentum" style="width:${allCard.high_conf_hit_rate*100}%"></div></div>
             </div>` : ''}
         </div>`;
     }
 
+    const hasScorecardData = ['7d', '30d', 'all'].some(k => sc[k] && sc[k].total_picks > 0);
+
+    // ML Model Performance section
+    let modelHtml = '';
+    if (mm.accuracy || scorer.hit_rate) {
+        modelHtml = `
+        <div class="card">
+            <div class="card-title">ML Model Performance</div>
+            ${mm.version ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Model: v${mm.version}</div>` : ''}
+            ${mm.accuracy ? `
+            <div class="weight-bar-container">
+                <div class="weight-bar-label"><span>Accuracy</span><span>${(mm.accuracy * 100).toFixed(1)}%</span></div>
+                <div class="weight-bar"><div class="weight-bar-fill technical" style="width:${mm.accuracy * 100}%"></div></div>
+            </div>` : ''}
+            ${mm.auc_roc ? `
+            <div class="weight-bar-container">
+                <div class="weight-bar-label"><span>AUC-ROC</span><span>${(mm.auc_roc * 100).toFixed(1)}%</span></div>
+                <div class="weight-bar"><div class="weight-bar-fill fundamental" style="width:${mm.auc_roc * 100}%"></div></div>
+            </div>` : ''}
+            ${scorer.hit_rate ? `
+            <div class="weight-bar-container">
+                <div class="weight-bar-label"><span>Scorer Hit Rate</span><span>${(scorer.hit_rate * 100).toFixed(1)}%</span></div>
+                <div class="weight-bar"><div class="weight-bar-fill momentum" style="width:${scorer.hit_rate * 100}%"></div></div>
+            </div>` : ''}
+            ${scorer.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:8px">Training samples: ${scorer.training_samples}</div>` : ''}
+            ${mm.symbols_analyzed ? `<div style="font-size:13px;color:var(--text-secondary)">Symbols analyzed: ${mm.symbols_analyzed}</div>` : ''}
+            ${mm.feature_count ? `<div style="font-size:13px;color:var(--text-secondary)">Features: ${mm.feature_count}</div>` : ''}
+        </div>`;
+    }
+
+    // Scorer scorecard section
+    let scorerHtml = '';
+    if (scorerCard.hit_rate_30d || scorerCard.avg_return_30d || scorerCard.alpha_30d) {
+        scorerHtml = `
+        <div class="card">
+            <div class="card-title">Scorer Scorecard</div>
+            ${scorerCard.hit_rate_30d != null ? `
+            <div class="weight-bar-container">
+                <div class="weight-bar-label"><span>30d Hit Rate</span><span>${(scorerCard.hit_rate_30d * 100).toFixed(1)}%</span></div>
+                <div class="weight-bar"><div class="weight-bar-fill technical" style="width:${scorerCard.hit_rate_30d * 100}%"></div></div>
+            </div>` : ''}
+            ${scorerCard.strong_buy_hit_rate != null ? `
+            <div class="weight-bar-container">
+                <div class="weight-bar-label"><span>Strong Buy Hit Rate</span><span>${(scorerCard.strong_buy_hit_rate * 100).toFixed(1)}%</span></div>
+                <div class="weight-bar"><div class="weight-bar-fill fundamental" style="width:${scorerCard.strong_buy_hit_rate * 100}%"></div></div>
+            </div>` : ''}
+            ${scorerCard.avg_return_30d != null ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:8px">Avg Return (30d): <span class="${pctClass(scorerCard.avg_return_30d)}">${pctSign(scorerCard.avg_return_30d)}</span></div>` : ''}
+            ${scorerCard.alpha_30d != null ? `<div style="font-size:13px;color:var(--text-secondary)">Alpha (30d): <span class="${pctClass(scorerCard.alpha_30d)}">${pctSign(scorerCard.alpha_30d)}</span></div>` : ''}
+        </div>`;
+    }
+
+    // Empty state message
+    let emptyHtml = '';
+    if (!hasScorecardData) {
+        emptyHtml = `
+        <div class="card" style="text-align:center;grid-column:1/-1">
+            <div style="font-size:16px;margin-bottom:8px">Prediction Performance</div>
+            <p style="color:var(--text-secondary)">Performance tracking starts after 7 days of predictions. Scorecard data will appear here once outcomes are recorded.</p>
+        </div>`;
+    }
+
     return `
-    <div class="page-title">📈 Performance</div>
+    <div class="page-title">Performance</div>
+    ${modelHtml || scorerHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">ML Model Metrics</div>' : ''}
     <div class="card-grid">
-        ${scorecardCard('7d', sc['7d'])}
-        ${scorecardCard('30d', sc['30d'])}
-        ${scorecardCard('all', sc.all)}
-        ${calibrationHtml}
+        ${modelHtml}
+        ${scorerHtml}
+    </div>
+    ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
+    <div class="card-grid">
+        ${hasScorecardData ? `
+            ${scorecardCard('7d', sc['7d'])}
+            ${scorecardCard('30d', sc['30d'])}
+            ${scorecardCard('all', sc.all)}
+            ${calibrationHtml}
+        ` : emptyHtml}
     </div>`;
 });
 
@@ -331,7 +403,7 @@ async function renderStockDetail(symbol) {
     </div>
 
     <div class="flow-container">
-        <div class="flow-title">📐 Decision Flow — How This Score Was Made</div>
+        <div class="flow-title">Decision Flow — How This Score Was Made</div>
         <div class="flow-pipeline">
             ${flowHtml}
             <div class="flow-stage" style="border-color:var(--accent-blue)">
@@ -374,7 +446,7 @@ Router.register('/budget', async () => {
     const pct = (spent / budget * 100);
 
     return `
-    <div class="page-title">💰 Budget</div>
+    <div class="page-title">Budget</div>
     <div class="card-grid">
         <div class="card">
             <div class="card-title">Current Spend</div>
@@ -421,23 +493,45 @@ Router.register('/system', async () => {
 
     const model = data.model || {};
     const test = data.self_test || {};
+    const training = data.training || {};
+
+    // Data sources enabled
+    const sources = [];
+    if (model.has_llm) sources.push('LLM');
+    if (model.has_fq) sources.push('FQ');
+    if (model.has_mi) sources.push('MI');
+    if (model.has_social) sources.push('Social');
+    const sourcesStr = sources.length > 0 ? sources.join(', ') : '—';
 
     return `
-    <div class="page-title">🔧 System Health</div>
+    <div class="page-title">System Health</div>
 
     <div class="card-grid">
         <div class="card">
             <div class="card-title">ML Model</div>
             <div class="card-value neutral">v${model.version || '?'}</div>
             <div class="card-subtitle">Features: ${model.feature_count || '?'}</div>
+            ${model.accuracy ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Accuracy: ${(model.accuracy * 100).toFixed(1)}%</div>` : ''}
+            ${model.auc_roc ? `<div style="font-size:13px;color:var(--text-secondary)">AUC-ROC: ${(model.auc_roc * 100).toFixed(1)}%</div>` : ''}
+            <div style="font-size:13px;color:var(--text-secondary)">Sources: ${sourcesStr}</div>
+            ${model.symbols_analyzed ? `<div style="font-size:13px;color:var(--text-secondary)">Symbols: ${model.symbols_analyzed}</div>` : ''}
+            ${model.trained_at ? `<div style="font-size:13px;color:var(--text-secondary)">Trained: ${timeSince(model.trained_at)}</div>` : ''}
         </div>
         <div class="card">
             <div class="card-title">Self-Test</div>
             <div class="card-value ${test.all_passed ? 'positive' : (test.failed > 0 ? 'negative' : 'neutral')}">
                 ${test.passed || '?'}/${test.total || '?'}
             </div>
-            <div class="card-subtitle">${test.all_passed ? '✅ All passing' : `❌ ${test.failed} failed`}</div>
+            <div class="card-subtitle">${test.all_passed ? '✅ All passing' : (test.failed > 0 ? `❌ ${test.failed} failed` : 'No data')}</div>
         </div>
+        ${training.action ? `
+        <div class="card">
+            <div class="card-title">Training Status</div>
+            <div class="card-value ${training.action === 'failed' ? 'negative' : 'positive'}">${training.action}</div>
+            <div class="card-subtitle">${timeSince(training.trained_at)}</div>
+            ${training.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Samples: ${training.training_samples}</div>` : ''}
+            ${training.budget_tier ? `<div style="font-size:13px;color:var(--text-secondary)">Budget: ${training.budget_tier}</div>` : ''}
+        </div>` : ''}
     </div>
 
     <div class="table-container">
