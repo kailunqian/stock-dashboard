@@ -442,4 +442,16 @@ Router.handleRoute = async function() {
     return _origHandleRoute();
 };
 
-document.addEventListener('DOMContentLoaded', () => Router.handleRoute());
+document.addEventListener('DOMContentLoaded', () => {
+    // Extract session token from URL (magic link redirect)
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    if (token) {
+        API.token = token;
+        localStorage.setItem('session_token', token);
+        // Clean URL — remove ?token= but keep hash
+        const hash = window.location.hash || '#/daily';
+        window.history.replaceState({}, '', window.location.pathname + hash);
+    }
+    Router.handleRoute();
+});
