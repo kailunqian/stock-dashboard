@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script>
+        // GitHub Pages SPA redirect — sends all paths to index.html with hash routing
+        var path = window.location.pathname.replace('/stock-dashboard', '');
+        window.location.replace('/stock-dashboard/#' + (path || '/login'));
+    </script>
+</head>
+<body></body>
+</html>
