@@ -613,8 +613,20 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
 
 .pipe-tag.t-green { background: rgba(63,185,80,0.1); color: var(--accent-green); }
 .pipe-tag.t-purple { background: rgba(188,140,255,0.1); color: var(--accent-purple); }
+.pipe-tag.t-dim { background: rgba(139,148,158,0.08); color: var(--text-secondary); font-style: italic; }
 .pipe-tag.t-yellow { background: rgba(210,153,34,0.1); color: var(--accent-yellow); }
 .pipe-tag.t-red { background: rgba(248,81,73,0.1); color: var(--accent-red); }
+
+.pipeline-shadow-badge {
+    font-size: 9px;
+    font-weight: 400;
+    color: var(--accent-purple);
+    background: rgba(188,140,255,0.1);
+    padding: 1px 6px;
+    border-radius: 8px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
 
 /* Weight mini-bars */
 .pipe-wt {

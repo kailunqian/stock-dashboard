@@ -186,11 +186,14 @@ Router.register('/daily', async () => {
         `<span class="pipe-tag">${g.name} ${g.count}</span>`
     ).join('');
 
-    // Strategy tags
-    const stratTags = strategies.map(s =>
-        `<span class="pipe-tag t-purple">${s.abbr}</span>`
-    ).join('');
-    const stratDesc = strategies.map(s => s.focus).join(' · ');
+    // Strategy tags — show active vs shadow
+    const activeStrats = strategies.filter(s => s.status === 'active');
+    const shadowStrats = strategies.filter(s => s.status === 'shadow');
+    const stratCounts = pipe.strategy_counts || {};
+    const stratTags = activeStrats.map(s =>
+        `<span class="pipe-tag t-purple" title="${s.focus || ''}">${s.abbr}</span>`
+    ).join('') + (shadowStrats.length ? `<span class="pipe-tag t-dim" title="${shadowStrats.length} shadow strategies competing">+${shadowStrats.length} shadow</span>` : '');
+    const stratDesc = activeStrats.slice(0, 4).map(s => s.focus || s.name).join(' · ');
 
     // Model component tags
     const modelTags = (mdlInfo.components || ['GBM','RF','LR']).map(c =>
@@ -234,7 +237,7 @@ Router.register('/daily', async () => {
             ${arrow}
             <div class="pipeline-step" style="animation-delay:0.24s">
                 <div class="pipeline-step-head"><span class="pipeline-step-dot c-yellow"></span><span class="pipeline-step-title">Strategies</span></div>
-                <div class="pipeline-step-value">${strategies.length || 4}</div>
+                <div class="pipeline-step-value">${stratCounts.active || activeStrats.length || 4}${shadowStrats.length ? `<span class="pipeline-shadow-badge">+${shadowStrats.length} evolving</span>` : ''}</div>
                 <div class="pipeline-step-tags">${stratTags || '<span class="pipe-tag t-purple">MOM</span><span class="pipe-tag t-purple">VAL</span><span class="pipe-tag t-purple">BRK</span><span class="pipe-tag t-purple">ACC</span>'}</div>
                 <div class="pipeline-step-detail" style="margin-top:3px">${stratDesc || 'Momentum · Value · Breakout · Accumulation'}</div>
             </div>
@@ -606,16 +609,22 @@ Router.register('/budget', async () => {
             <div class="card-value ${cost.forecast > budget ? 'negative' : 'positive'}">$${cost.forecast.toFixed(2)}</div>
             <div class="card-subtitle">${cost.forecast > budget ? '⚠️ Over budget' : '✅ On track'}</div>
         </div>` : ''}
-        ${cost.breakdown ? `
+        ${cost.breakdown && Object.keys(cost.breakdown).length > 0 ? `
         <div class="card">
-            <div class="card-title">Cost Breakdown</div>
-            ${Object.entries(cost.breakdown).map(([k,v]) => `
+            <div class="card-title">Cost Breakdown${cost.breakdown_estimated ? ' <span style="font-size:10px;color:var(--text-secondary)">(estimated)</span>' : ''}</div>
+            ${Object.entries(cost.breakdown).sort((a,b) => b[1] - a[1]).map(([k,v]) => `
                 <div class="weight-bar-container">
-                    <div class="weight-bar-label"><span>${k}</span><span>$${v.toFixed(2)}</span></div>
-                    <div class="weight-bar"><div class="weight-bar-fill technical" style="width:${(v/spent*100).toFixed(0)}%"></div></div>
+                    <div class="weight-bar-label"><span>${k}</span><span>$${typeof v === 'number' ? v.toFixed(2) : v}</span></div>
+                    <div class="weight-bar"><div class="weight-bar-fill technical" style="width:${spent > 0 ? (v/spent*100).toFixed(0) : 0}%"></div></div>
                 </div>
             `).join('')}
-        </div>` : ''}
+        </div>` : `
+        <div class="card">
+            <div class="card-title">Cost Breakdown</div>
+            <div style="color:var(--text-secondary);font-size:13px;padding:12px 0">
+                ${cost.note || 'Awaiting next cost check cycle'}
+            </div>
+        </div>`}
     </div>`;
 });
 
