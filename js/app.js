@@ -168,7 +168,7 @@ Router.register('/daily', async () => {
     const weights = scoring.weights || {};
     const output = pipe.output || {};
 
-    const scanned = pipe.stocks_fetched || scan.stocks_scanned || '~150';
+    const scanned = (pipe.stocks_fetched > 0 ? pipe.stocks_fetched : null) ?? scan.stocks_scanned ?? '~150';
     const features = pipe.features?.total || model.feature_count || 72;
     const accuracy = (mdlInfo.accuracy || model.accuracy) ? `${((mdlInfo.accuracy || model.accuracy) * 100).toFixed(0)}%` : '—';
     const topPicks = output.picks || scan.top_picks?.length || scan.actionable || 0;
