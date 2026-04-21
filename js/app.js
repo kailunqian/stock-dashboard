@@ -36,6 +36,8 @@ const Router = {
             main.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Loading...</div>';
             try {
                 main.innerHTML = await handler();
+                // Post-render: hydrate DAG if present
+                _hydrateDag(main);
             } catch (e) {
                 main.innerHTML = `<div class="card" style="margin:40px auto;max-width:500px;text-align:center">
                     <h3>⚠️ Error</h3><p style="color:var(--text-secondary)">${e.message}</p></div>`;
@@ -173,96 +175,98 @@ Router.register('/daily', async () => {
     const accuracy = (mdlInfo.accuracy || model.accuracy) ? `${((mdlInfo.accuracy || model.accuracy) * 100).toFixed(0)}%` : '—';
     const topPicks = output.picks || scan.top_picks?.length || scan.actionable || 0;
 
-    const arrow = '<span class="pipeline-arrow">→</span>';
-
-    // Source tags
-    const srcTags = sources.map(s => {
-        const cls = {market:'t-green',social:'t-purple',news:'t-yellow',fundamental:'t-red',llm:'',macro:'t-yellow'}[s.type] || '';
-        return `<span class="pipe-tag ${cls}">${s.name}</span>`;
-    }).join('');
-
-    // Feature breakdown
-    const featDetail = featGroups.map(g =>
-        `<span class="pipe-tag">${g.name} ${g.count}</span>`
-    ).join('');
-
-    // Strategy tags — show active vs shadow
-    const activeStrats = strategies.filter(s => s.status === 'active');
-    const shadowStrats = strategies.filter(s => s.status === 'shadow');
-    const stratCounts = pipe.strategy_counts || {};
-    const stratTags = activeStrats.map(s =>
-        `<span class="pipe-tag t-purple" title="${s.focus || ''}">${s.abbr}</span>`
-    ).join('') + (shadowStrats.length ? `<span class="pipe-tag t-dim" title="${shadowStrats.length} shadow strategies competing">+${shadowStrats.length} shadow</span>` : '');
-    const stratDesc = activeStrats.slice(0, 4).map(s => s.focus || s.name).join(' · ');
-
-    // Model component tags
-    const modelTags = (mdlInfo.components || ['GBM','RF','LR']).map(c =>
-        `<span class="pipe-tag t-green">${c}</span>`
-    ).join('');
-
-    // Weight mini-bars
-    const wtBars = Object.entries(weights).map(([k,v]) =>
-        `<div class="pipe-wt"><span>${k.replace('_',' ')}</span><div class="pipe-wt-bar"><div class="pipe-wt-fill" style="width:${v*100}%"></div></div><span>${(v*100).toFixed(0)}%</span></div>`
-    ).join('');
-
-    // Delivery tags
-    const delTags = (output.delivery || ['Telegram','Email','Dashboard']).map(d =>
-        `<span class="pipe-tag t-purple">${d}</span>`
-    ).join('');
-
-    const pipelineHtml = `
-    <div class="pipeline-container">
-        <div class="pipeline-header">
-            <span class="pipeline-live"></span> Analysis Pipeline
-            ${scan.scanned_at ? `<span style="margin-left:auto;font-size:11px">Last run: ${timeSince(scan.scanned_at)}</span>` : ''}
-        </div>
-        <div class="pipeline-flow">
-            <div class="pipeline-step" style="animation-delay:0s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-green"></span><span class="pipeline-step-title">Data Sources</span></div>
-                <div class="pipeline-step-value">${sources.length || 7}</div>
-                <div class="pipeline-step-tags">${srcTags || '<span class="pipe-tag t-green">Yahoo</span><span class="pipe-tag t-yellow">News</span><span class="pipe-tag t-purple">Social</span>'}</div>
-            </div>
-            ${arrow}
-            <div class="pipeline-step" style="animation-delay:0.08s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-blue"></span><span class="pipeline-step-title">Stocks Scanned</span></div>
-                <div class="pipeline-step-value">${scanned}</div>
-                <div class="pipeline-step-detail">Auto-discovery + Watchlist</div>
-            </div>
-            ${arrow}
-            <div class="pipeline-step" style="animation-delay:0.16s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-purple"></span><span class="pipeline-step-title">Features</span></div>
-                <div class="pipeline-step-value">${features}</div>
-                <div class="pipeline-step-tags">${featDetail || '<span class="pipe-tag">Tech 25</span><span class="pipe-tag">Fund 15</span><span class="pipe-tag">Sent 12</span><span class="pipe-tag">MI 10</span>'}</div>
-            </div>
-            ${arrow}
-            <div class="pipeline-step" style="animation-delay:0.24s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-yellow"></span><span class="pipeline-step-title">Strategies</span></div>
-                <div class="pipeline-step-value">${stratCounts.active || activeStrats.length || 4}${shadowStrats.length ? `<span class="pipeline-shadow-badge">+${shadowStrats.length} evolving</span>` : ''}</div>
-                <div class="pipeline-step-tags">${stratTags || '<span class="pipe-tag t-purple">MOM</span><span class="pipe-tag t-purple">VAL</span><span class="pipe-tag t-purple">BRK</span><span class="pipe-tag t-purple">ACC</span>'}</div>
-                <div class="pipeline-step-detail" style="margin-top:3px">${stratDesc || 'Momentum · Value · Breakout · Accumulation'}</div>
-            </div>
-            ${arrow}
-            <div class="pipeline-step" style="animation-delay:0.32s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-cyan"></span><span class="pipeline-step-title">ML Ensemble</span></div>
-                <div class="pipeline-step-value">${accuracy}</div>
-                <div class="pipeline-step-tags">${modelTags}</div>
-                ${mdlInfo.samples ? `<div class="pipeline-step-detail" style="margin-top:3px">${mdlInfo.samples.toLocaleString()} samples</div>` : ''}
-            </div>
-            ${arrow}
-            <div class="pipeline-step" style="animation-delay:0.4s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-red"></span><span class="pipeline-step-title">Weighted Score</span></div>
-                <div class="pipeline-step-value">≥${scoring.threshold || 75}</div>
-                ${wtBars || '<div class="pipeline-step-detail">Technical 30% · ML 25% · Fund 20%</div>'}
-            </div>
-            ${arrow}
-            <div class="pipeline-step" style="animation-delay:0.48s">
-                <div class="pipeline-step-head"><span class="pipeline-step-dot c-green"></span><span class="pipeline-step-title">Top Picks</span></div>
-                <div class="pipeline-step-value">${topPicks}</div>
-                ${output.top_pick ? `<div class="pipeline-step-detail">Best: <strong>${output.top_pick}</strong>${output.top_score ? ` (${output.top_score.toFixed(0)})` : ''}</div>` : ''}
-                <div class="pipeline-step-tags" style="margin-top:3px">${delTags}</div>
-            </div>
-        </div>
+    // Pipeline header (shared between old linear and new DAG view)
+    const pipelineHeader = `<div class="pipeline-header">
+        <span class="pipeline-live"></span> Analysis Pipeline
+        ${scan.scanned_at ? `<span style="margin-left:auto;font-size:11px">Last run: ${timeSince(scan.scanned_at)}</span>` : ''}
     </div>`;
+
+    let pipelineHtml;
+
+    // v2 DAG renderer (if graph data available)
+    if (pipe.graph && pipe.graph.version >= 2) {
+        pipelineHtml = `<div class="pipeline-container">${pipelineHeader}<div class="dag-container" id="dag-root"></div></div>`;
+    } else {
+        // Fallback: legacy linear pipeline
+        const arrow = '<span class="pipeline-arrow">→</span>';
+        const srcTags = sources.map(s => {
+            const cls = {market:'t-green',social:'t-purple',news:'t-yellow',fundamental:'t-red',llm:'',macro:'t-yellow'}[s.type] || '';
+            return `<span class="pipe-tag ${cls}">${s.name}</span>`;
+        }).join('');
+        const featDetail = featGroups.map(g =>
+            `<span class="pipe-tag">${g.name} ${g.count}</span>`
+        ).join('');
+        const activeStrats = strategies.filter(s => s.status === 'active');
+        const shadowStrats = strategies.filter(s => s.status === 'shadow');
+        const stratCounts = pipe.strategy_counts || {};
+        const stratTags = activeStrats.map(s =>
+            `<span class="pipe-tag t-purple" title="${s.focus || ''}">${s.abbr}</span>`
+        ).join('') + (shadowStrats.length ? `<span class="pipe-tag t-dim" title="${shadowStrats.length} shadow strategies competing">+${shadowStrats.length} shadow</span>` : '');
+        const stratDesc = activeStrats.slice(0, 4).map(s => s.focus || s.name).join(' · ');
+        const modelTags = (mdlInfo.components || ['GBM','RF','LR']).map(c =>
+            `<span class="pipe-tag t-green">${c}</span>`
+        ).join('');
+        const wtBars = Object.entries(weights).map(([k,v]) =>
+            `<div class="pipe-wt"><span>${k.replace('_',' ')}</span><div class="pipe-wt-bar"><div class="pipe-wt-fill" style="width:${v*100}%"></div></div><span>${(v*100).toFixed(0)}%</span></div>`
+        ).join('');
+        const delTags = (output.delivery || ['Telegram','Email','Dashboard']).map(d =>
+            `<span class="pipe-tag t-purple">${d}</span>`
+        ).join('');
+
+        pipelineHtml = `
+        <div class="pipeline-container">
+            ${pipelineHeader}
+            <div class="pipeline-flow">
+                <div class="pipeline-step" style="animation-delay:0s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-green"></span><span class="pipeline-step-title">Data Sources</span></div>
+                    <div class="pipeline-step-value">${sources.length || 7}</div>
+                    <div class="pipeline-step-tags">${srcTags || '<span class="pipe-tag t-green">Yahoo</span><span class="pipe-tag t-yellow">News</span><span class="pipe-tag t-purple">Social</span>'}</div>
+                </div>
+                ${arrow}
+                <div class="pipeline-step" style="animation-delay:0.08s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-blue"></span><span class="pipeline-step-title">Stocks Scanned</span></div>
+                    <div class="pipeline-step-value">${scanned}</div>
+                    <div class="pipeline-step-detail">Auto-discovery + Watchlist</div>
+                </div>
+                ${arrow}
+                <div class="pipeline-step" style="animation-delay:0.16s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-purple"></span><span class="pipeline-step-title">Features</span></div>
+                    <div class="pipeline-step-value">${features}</div>
+                    <div class="pipeline-step-tags">${featDetail || '<span class="pipe-tag">Tech 25</span><span class="pipe-tag">Fund 15</span><span class="pipe-tag">Sent 12</span><span class="pipe-tag">MI 10</span>'}</div>
+                </div>
+                ${arrow}
+                <div class="pipeline-step" style="animation-delay:0.24s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-yellow"></span><span class="pipeline-step-title">Strategies</span></div>
+                    <div class="pipeline-step-value">${stratCounts.active || activeStrats.length || 4}${shadowStrats.length ? `<span class="pipeline-shadow-badge">+${shadowStrats.length} evolving</span>` : ''}</div>
+                    <div class="pipeline-step-tags">${stratTags || '<span class="pipe-tag t-purple">MOM</span><span class="pipe-tag t-purple">VAL</span><span class="pipe-tag t-purple">BRK</span><span class="pipe-tag t-purple">ACC</span>'}</div>
+                    <div class="pipeline-step-detail" style="margin-top:3px">${stratDesc || 'Momentum · Value · Breakout · Accumulation'}</div>
+                </div>
+                ${arrow}
+                <div class="pipeline-step" style="animation-delay:0.32s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-cyan"></span><span class="pipeline-step-title">ML Ensemble</span></div>
+                    <div class="pipeline-step-value">${accuracy}</div>
+                    <div class="pipeline-step-tags">${modelTags}</div>
+                    ${mdlInfo.samples ? `<div class="pipeline-step-detail" style="margin-top:3px">${mdlInfo.samples.toLocaleString()} samples</div>` : ''}
+                </div>
+                ${arrow}
+                <div class="pipeline-step" style="animation-delay:0.4s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-red"></span><span class="pipeline-step-title">Weighted Score</span></div>
+                    <div class="pipeline-step-value">≥${scoring.threshold || 75}</div>
+                    ${wtBars || '<div class="pipeline-step-detail">Technical 30% · ML 25% · Fund 20%</div>'}
+                </div>
+                ${arrow}
+                <div class="pipeline-step" style="animation-delay:0.48s">
+                    <div class="pipeline-step-head"><span class="pipeline-step-dot c-green"></span><span class="pipeline-step-title">Top Picks</span></div>
+                    <div class="pipeline-step-value">${topPicks}</div>
+                    ${output.top_pick ? `<div class="pipeline-step-detail">Best: <strong>${output.top_pick}</strong>${output.top_score ? ` (${output.top_score.toFixed(0)})` : ''}</div>` : ''}
+                    <div class="pipeline-step-tags" style="margin-top:3px">${delTags}</div>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    // Store graph data for post-render hydration
+    window._dagGraphData = (pipe.graph && pipe.graph.version >= 2) ? pipe.graph : null;
 
     return `
     <div class="page-title">Daily Report</div>
@@ -715,6 +719,133 @@ Router.handleRoute = async function() {
     }
     return _origHandleRoute();
 };
+
+// ── DAG Pipeline Renderer ────────────────────────────────────────────
+
+/** Stash for active ResizeObserver so we can disconnect on re-render. */
+let _dagResizeObserver = null;
+
+/** Post-render hook: if #dag-root exists and graph data is available, build the DAG. */
+function _hydrateDag(container) {
+    const root = container.querySelector('#dag-root');
+    if (!root || !window._dagGraphData) return;
+    _renderPipelineGraph(root, window._dagGraphData);
+    window._dagGraphData = null;
+}
+
+function _renderPipelineGraph(container, graphData) {
+    container.innerHTML = '';
+    if (_dagResizeObserver) { _dagResizeObserver.disconnect(); _dagResizeObserver = null; }
+
+    const isMobile = window.innerWidth < 768;
+    const layers = (graphData.layers || []).slice().sort((a, b) => a.order - b.order);
+    const nodes = graphData.nodes || [];
+    const edges = graphData.edges || [];
+
+    layers.forEach(layer => {
+        const col = document.createElement('div');
+        col.className = 'dag-layer';
+        col.dataset.layerId = layer.id;
+
+        const header = document.createElement('div');
+        header.className = 'dag-layer-header';
+        header.textContent = layer.label;
+        col.appendChild(header);
+
+        let layerNodes = nodes
+            .filter(n => n.layer === layer.id)
+            .sort((a, b) => a.order - b.order);
+
+        // Mobile: collapse layers with many nodes
+        if (isMobile && layerNodes.length > 4) {
+            const summary = document.createElement('div');
+            summary.className = 'dag-node dag-source dag-active dag-collapse-toggle';
+            summary.innerHTML = `<span class="dag-node-dot"></span><span class="dag-node-label">${layerNodes.length} nodes</span>`;
+            const detail = document.createElement('div');
+            detail.className = 'dag-collapse-body';
+            detail.style.display = 'none';
+            layerNodes.forEach(node => detail.appendChild(_makeNodeCard(node)));
+            summary.addEventListener('click', () => {
+                const open = detail.style.display !== 'none';
+                detail.style.display = open ? 'none' : '';
+                summary.querySelector('.dag-node-label').textContent = open ? `${layerNodes.length} nodes` : 'Collapse';
+            });
+            col.appendChild(summary);
+            col.appendChild(detail);
+        } else {
+            layerNodes.forEach(node => col.appendChild(_makeNodeCard(node)));
+        }
+
+        container.appendChild(col);
+    });
+
+    // SVG overlay for edges
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.classList.add('dag-edges');
+    container.appendChild(svg);
+
+    const draw = () => _drawEdges(container, svg, edges, isMobile);
+    requestAnimationFrame(draw);
+
+    _dagResizeObserver = new ResizeObserver(() => requestAnimationFrame(draw));
+    _dagResizeObserver.observe(container);
+}
+
+function _makeNodeCard(node) {
+    const card = document.createElement('div');
+    const kindClass = `dag-${node.kind}`;
+    const statusClass = `dag-${node.status}`;
+    const feedbackBorder = node.kind === 'feedback' ? ' dag-feedback-kind' : '';
+    card.className = `dag-node ${kindClass} ${statusClass}${feedbackBorder}`;
+    card.dataset.nodeId = node.id;
+    card.innerHTML = `<span class="dag-node-dot"></span><span class="dag-node-label">${node.label}</span>${node.metric ? `<span class="dag-node-metric">${node.metric}</span>` : ''}`;
+    return card;
+}
+
+function _drawEdges(container, svg, edges, isMobile) {
+    svg.innerHTML = '';
+    const rect = container.getBoundingClientRect();
+    svg.setAttribute('width', rect.width);
+    svg.setAttribute('height', rect.height);
+
+    // On mobile, skip feedback edges
+    const filtered = isMobile ? edges.filter(e => e.type !== 'feedback') : edges;
+
+    filtered.forEach(edge => {
+        const fromEl = container.querySelector(`[data-node-id="${CSS.escape(edge.from)}"]`);
+        const toEl = container.querySelector(`[data-node-id="${CSS.escape(edge.to)}"]`);
+        if (!fromEl || !toEl) return;
+
+        const fR = fromEl.getBoundingClientRect();
+        const tR = toEl.getBoundingClientRect();
+
+        let x1, y1, x2, y2;
+        if (isMobile) {
+            // Vertical layout: connect bottom→top
+            x1 = fR.left + fR.width / 2 - rect.left;
+            y1 = fR.bottom - rect.top;
+            x2 = tR.left + tR.width / 2 - rect.left;
+            y2 = tR.top - rect.top;
+        } else {
+            // Horizontal layout: connect right→left
+            x1 = fR.right - rect.left;
+            y1 = fR.top + fR.height / 2 - rect.top;
+            x2 = tR.left - rect.left;
+            y2 = tR.top + tR.height / 2 - rect.top;
+        }
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        if (isMobile) {
+            const cy = (y1 + y2) / 2;
+            path.setAttribute('d', `M${x1},${y1} C${x1},${cy} ${x2},${cy} ${x2},${y2}`);
+        } else {
+            const cx = (x1 + x2) / 2;
+            path.setAttribute('d', `M${x1},${y1} C${cx},${y1} ${cx},${y2} ${x2},${y2}`);
+        }
+        path.classList.add(`dag-edge-${edge.type}`);
+        svg.appendChild(path);
+    });
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Extract session token from URL (magic link redirect)

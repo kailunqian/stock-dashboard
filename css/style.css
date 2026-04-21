@@ -673,3 +673,152 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
     .pipeline-step { max-width: none; }
     .pipeline-arrow { transform: rotate(90deg); align-self: center; }
 }
+
+/* ── DAG Pipeline Visualization ─────────────────────────────────── */
+.dag-container {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    padding: 4px 0 0;
+    overflow: hidden;
+}
+
+.dag-layer {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    z-index: 1;
+}
+
+.dag-layer-header {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    text-align: center;
+}
+
+.dag-node {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    font-size: 9px;
+    cursor: default;
+    transition: all 0.2s;
+    white-space: nowrap;
+    overflow: hidden;
+    opacity: 0;
+    animation: stepIn 0.3s ease-out forwards;
+}
+
+.dag-node:hover {
+    border-color: var(--accent-blue);
+    z-index: 10;
+}
+
+.dag-node-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* Kind-based dot colors */
+.dag-source .dag-node-dot { background: var(--accent-green); }
+.dag-transform .dag-node-dot { background: var(--accent-blue); }
+.dag-model .dag-node-dot { background: #39d2c0; }
+.dag-strategy .dag-node-dot { background: var(--accent-purple); }
+.dag-scorer .dag-node-dot { background: var(--accent-red); }
+.dag-sink .dag-node-dot { background: var(--accent-yellow); }
+.dag-feedback .dag-node-dot { background: #f78166; }
+
+/* Status styles */
+.dag-shadow { opacity: 0.5; font-style: italic; }
+.dag-disabled { opacity: 0.3; text-decoration: line-through; }
+.dag-degraded { opacity: 0.7; border-color: var(--accent-yellow); }
+.dag-feedback-kind { border-style: dashed; }
+
+.dag-node-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: var(--text-primary);
+}
+
+.dag-node-metric {
+    font-weight: 600;
+    color: var(--accent-green);
+    font-size: 9px;
+    flex-shrink: 0;
+}
+
+/* Collapsible toggle on mobile */
+.dag-collapse-toggle { cursor: pointer; }
+.dag-collapse-body { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+
+/* SVG edges overlay */
+.dag-edges {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dag-edge-data {
+    fill: none;
+    stroke: rgba(88, 166, 255, 0.15);
+    stroke-width: 1.5;
+}
+
+.dag-edge-signal {
+    fill: none;
+    stroke: rgba(63, 185, 80, 0.2);
+    stroke-width: 1.5;
+}
+
+.dag-edge-feedback {
+    fill: none;
+    stroke: rgba(247, 129, 102, 0.2);
+    stroke-width: 1;
+    stroke-dasharray: 4 3;
+    animation: dashFlow 2s linear infinite;
+}
+
+@keyframes dashFlow {
+    to { stroke-dashoffset: -14; }
+}
+
+/* Mobile: vertical DAG layout */
+@media (max-width: 768px) {
+    .dag-container {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .dag-layer {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .dag-layer-header {
+        width: 100%;
+        text-align: left;
+    }
+    .dag-edges { display: none; }
+    .dag-layer:not(:last-child)::after {
+        content: '↓';
+        display: block;
+        width: 100%;
+        text-align: center;
+        color: var(--border);
+        font-size: 14px;
+        margin-top: 4px;
+    }
+}
