@@ -481,14 +481,65 @@ Router.register('/performance', async () => {
         </div>`;
     }
 
-    // Empty state message
+    // Empty state message — show pending predictions and activity instead of just a message
     let emptyHtml = '';
     if (!hasScorecardData) {
-        emptyHtml = `
-        <div class="card" style="text-align:center;grid-column:1/-1">
-            <div style="font-size:16px;margin-bottom:8px">Prediction Performance</div>
-            <p style="color:var(--text-secondary)">Performance tracking starts after 7 days of predictions. Scorecard data will appear here once outcomes are recorded.</p>
-        </div>`;
+        const pending = data.pending_predictions || [];
+        const activity = data.prediction_activity || {};
+        const hasPending = pending.length > 0;
+        const hasActivity = activity.total > 0;
+
+        if (hasPending || hasActivity) {
+            let activitySummary = '';
+            if (hasActivity) {
+                activitySummary = `
+                <div style="display:flex;gap:24px;justify-content:center;margin-bottom:16px">
+                    <div><span style="font-size:24px;font-weight:bold">${activity.total}</span><div style="font-size:12px;color:var(--text-secondary)">Total Predictions</div></div>
+                    <div><span style="font-size:24px;font-weight:bold">${activity.with_outcomes}</span><div style="font-size:12px;color:var(--text-secondary)">With Outcomes</div></div>
+                    <div><span style="font-size:24px;font-weight:bold">${activity.pending}</span><div style="font-size:12px;color:var(--text-secondary)">Awaiting Results</div></div>
+                    <div><span style="font-size:24px;font-weight:bold">${activity.live_predictions}</span><div style="font-size:12px;color:var(--text-secondary)">Live Scans</div></div>
+                </div>`;
+            }
+
+            let pendingTable = '';
+            if (hasPending) {
+                pendingTable = `
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">Recent Predictions (Awaiting 7-Day Outcomes)</div>
+                <div class="table-container">
+                    <table>
+                        <thead><tr><th>Symbol</th><th>Score</th><th>Entry Price</th><th>Date</th><th>Type</th></tr></thead>
+                        <tbody>
+                            ${pending.slice(0, 10).map(p => `
+                            <tr>
+                                <td><a href="#/stock/${p.symbol}" style="color:var(--accent-blue)">${p.symbol}</a></td>
+                                <td><span class="${p.score >= 75 ? 'positive' : ''}">${(p.score||0).toFixed(0)}</span></td>
+                                <td>$${(p.entry_price||0).toFixed(2)}</td>
+                                <td>${p.signal_date ? new Date(p.signal_date).toLocaleDateString() : '—'}</td>
+                                <td>${p.signal_type || 'scan'}</td>
+                            </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            }
+
+            emptyHtml = `
+            <div class="card" style="grid-column:1/-1">
+                <div style="font-size:16px;margin-bottom:12px">📊 Prediction Activity</div>
+                ${activitySummary}
+                ${activity.with_outcomes > 0 && activity.backtest_samples > 0 ? `
+                    <div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+                        Includes ${activity.backtest_samples} backtest samples for ML training baseline
+                    </div>` : ''}
+                ${pendingTable}
+                ${activity.pending > 0 ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">⏳ Scorecard populates after outcome_tracker fills 7-day returns</div>` : ''}
+            </div>`;
+        } else {
+            emptyHtml = `
+            <div class="card" style="text-align:center;grid-column:1/-1">
+                <div style="font-size:16px;margin-bottom:8px">Prediction Performance</div>
+                <p style="color:var(--text-secondary)">No predictions yet. Run a scan to start building prediction history.</p>
+            </div>`;
+        }
     }
 
     // Strategy leaderboard
