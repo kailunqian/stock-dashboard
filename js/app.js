@@ -345,9 +345,10 @@ Router.register('/daily', async () => {
             ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary)">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
         </div>
         <div class="card">
-            <div class="card-title">Buy Signals</div>
-            <div class="card-value positive">${scan.actionable || 0}</div>
-            <div class="card-subtitle">Score ≥ 70</div>
+            <div class="card-title">Strong Buy</div>
+            <div class="card-value positive">${(scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length}</div>
+            <div class="card-subtitle">Score ≥ 85, no risks</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${scan.actionable || 0} actionable (≥70)</div>
         </div>
         <div class="card">
             <div class="card-title">Top Pick</div>
