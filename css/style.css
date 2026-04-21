@@ -153,6 +153,22 @@ body {
     margin-bottom: 24px;
 }
 
+/* Conviction tracker bar */
+.conviction-bar {
+    width: 60px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.conviction-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-yellow), var(--accent-green));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+
 .table-header {
     padding: 16px 20px;
     border-bottom: 1px solid var(--border);

@@ -64,6 +64,34 @@ function recPill(rec) {
     return pill(rec, map[rec] || 'blue');
 }
 
+function renderConvictionTracker(conviction) {
+    if (!conviction || conviction.length === 0) return '';
+    const rows = conviction.slice(0, 10).map(c => {
+        const trendIcon = c.trend === 'up' ? '📈' : c.trend === 'down' ? '📉' : '➡️';
+        const scoreColor = c.avg_score >= 75 ? 'positive' : c.avg_score >= 60 ? 'neutral' : 'negative';
+        const bar = Math.min(100, c.avg_score);
+        return `<tr>
+            <td><strong>${c.symbol}</strong></td>
+            <td class="${scoreColor}">${c.avg_score}</td>
+            <td>${c.appearances}d</td>
+            <td>${c.high_count}×</td>
+            <td>${trendIcon}</td>
+            <td><div class="conviction-bar"><div class="conviction-fill" style="width:${bar}%"></div></div></td>
+        </tr>`;
+    }).join('');
+    return `
+    <div class="table-container" style="margin-bottom:20px">
+        <div class="table-header">🎯 30-Day Conviction Tracker</div>
+        <table>
+            <thead><tr>
+                <th>Symbol</th><th>Avg Score</th><th>Tracked</th>
+                <th>Strong (≥75)</th><th>Trend</th><th>Conviction</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>`;
+}
+
 function timeSince(iso) {
     if (!iso) return '—';
     const diff = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -297,6 +325,8 @@ Router.register('/daily', async () => {
         </div>
         ${trainingHtml}
     </div>
+
+    ${renderConvictionTracker(data.conviction || [])}
 
     <div class="table-container">
         <div class="table-header">Today's Recommendations</div>
