@@ -158,8 +158,88 @@ Router.register('/daily', async () => {
         </div>`;
     }
 
+    // Build animated pipeline data from real scan results
+    const scanned = scan.stocks_scanned || '~150';
+    const features = model.feature_count || 72;
+    const accuracy = model.accuracy ? `${(model.accuracy * 100).toFixed(0)}%` : '—';
+    const actionable = scan.actionable || 0;
+    const topPicks = scan.top_picks?.length || actionable;
+
+    // SVG icons for each stage
+    const icons = {
+        source: '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 4.03 2 6.5v11C2 19.97 6.48 22 12 22s10-2.03 10-4.5v-11C22 4.03 17.52 2 12 2z"/><ellipse cx="12" cy="6.5" rx="10" ry="4.5"/></svg>',
+        feature: '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+        strategy: '<svg viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+        model: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>',
+        score: '<svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+        filter: '<svg viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>',
+        output: '<svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+    };
+
+    const connector = `<div class="pipeline-connector"><div class="pipeline-dot d1"></div><div class="pipeline-dot d2"></div></div>`;
+
+    const pipelineHtml = `
+    <div class="pipeline-container">
+        <div class="pipeline-header">
+            <span class="pipeline-live"></span> Analysis Pipeline
+            ${scan.scanned_at ? `<span style="margin-left:auto;font-size:11px">Last run: ${timeSince(scan.scanned_at)}</span>` : ''}
+        </div>
+        <div class="pipeline">
+            <div class="pipeline-stage active" style="animation-delay:0s">
+                <div class="pipeline-stage-icon source">${icons.source}</div>
+                <div class="pipeline-stage-value">7</div>
+                <div class="pipeline-stage-label">Data Sources</div>
+                <div class="pipeline-stage-detail">Yahoo, News, Social...</div>
+            </div>
+            ${connector}
+            <div class="pipeline-stage active" style="animation-delay:0.15s">
+                <div class="pipeline-stage-icon feature">${icons.feature}</div>
+                <div class="pipeline-stage-value">${scanned}</div>
+                <div class="pipeline-stage-label">Stocks Fetched</div>
+                <div class="pipeline-stage-detail">Discovery + Watchlist</div>
+            </div>
+            ${connector}
+            <div class="pipeline-stage active" style="animation-delay:0.3s">
+                <div class="pipeline-stage-icon strategy">${icons.strategy}</div>
+                <div class="pipeline-stage-value">${features}</div>
+                <div class="pipeline-stage-label">Features</div>
+                <div class="pipeline-stage-detail">Tech + Fund + LLM + MI</div>
+            </div>
+            ${connector}
+            <div class="pipeline-stage active" style="animation-delay:0.45s">
+                <div class="pipeline-stage-icon model">${icons.model}</div>
+                <div class="pipeline-stage-value">4</div>
+                <div class="pipeline-stage-label">Strategies</div>
+                <div class="pipeline-stage-detail">Mom · Val · Brk · Acc</div>
+            </div>
+            ${connector}
+            <div class="pipeline-stage active" style="animation-delay:0.6s">
+                <div class="pipeline-stage-icon score">${icons.score}</div>
+                <div class="pipeline-stage-value">${accuracy}</div>
+                <div class="pipeline-stage-label">ML Ensemble</div>
+                <div class="pipeline-stage-detail">GBM + RF + LR</div>
+            </div>
+            ${connector}
+            <div class="pipeline-stage active" style="animation-delay:0.75s">
+                <div class="pipeline-stage-icon filter">${icons.filter}</div>
+                <div class="pipeline-stage-value">≥75</div>
+                <div class="pipeline-stage-label">Score Filter</div>
+                <div class="pipeline-stage-detail">Buy threshold</div>
+            </div>
+            ${connector}
+            <div class="pipeline-stage active" style="animation-delay:0.9s">
+                <div class="pipeline-stage-icon output">${icons.output}</div>
+                <div class="pipeline-stage-value">${topPicks}</div>
+                <div class="pipeline-stage-label">Top Picks</div>
+                <div class="pipeline-stage-detail">${scan.top_pick ? `Best: ${scan.top_pick}` : 'Ranked by score'}</div>
+            </div>
+        </div>
+    </div>`;
+
     return `
     <div class="page-title">Daily Report</div>
+
+    ${pipelineHtml}
 
     <div class="card-grid">
         <div class="card">

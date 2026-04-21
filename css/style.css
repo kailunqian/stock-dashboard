@@ -482,4 +482,160 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
     .card-grid { grid-template-columns: 1fr; }
     .flow-pipeline { flex-direction: column; }
     .flow-stage::after { content: '↓'; right: auto; bottom: -14px; top: auto; left: 50%; transform: translateX(-50%); }
+    .pipeline { flex-direction: column; align-items: stretch; }
+    .pipeline-connector { width: 2px; height: 24px; flex-direction: column; }
+    .pipeline-connector .pipeline-dot { animation-name: dotFlowV; }
+}
+
+/* ── Animated Analysis Pipeline ─────────────────────────────────── */
+.pipeline-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    overflow-x: auto;
+}
+
+.pipeline-header {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pipeline-header .pipeline-live {
+    width: 6px; height: 6px;
+    background: var(--accent-green);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+.pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    min-width: max-content;
+}
+
+.pipeline-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 100px;
+    position: relative;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: stageReveal 0.4s ease-out forwards;
+}
+
+.pipeline-stage-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+    position: relative;
+    transition: box-shadow 0.3s;
+}
+
+.pipeline-stage-icon svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: white;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.pipeline-stage-icon.source { background: linear-gradient(135deg, #2ea043, #3fb950); }
+.pipeline-stage-icon.feature { background: linear-gradient(135deg, #1f6feb, #58a6ff); }
+.pipeline-stage-icon.strategy { background: linear-gradient(135deg, #8b5cf6, #bc8cff); }
+.pipeline-stage-icon.model { background: linear-gradient(135deg, #d29922, #e3b341); }
+.pipeline-stage-icon.score { background: linear-gradient(135deg, #0969da, #54aeff); }
+.pipeline-stage-icon.filter { background: linear-gradient(135deg, #cf222e, #f85149); }
+.pipeline-stage-icon.output { background: linear-gradient(135deg, #2ea043, #56d364); }
+
+.pipeline-stage.active .pipeline-stage-icon {
+    box-shadow: 0 0 16px rgba(88, 166, 255, 0.4);
+}
+
+.pipeline-stage-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-align: center;
+    white-space: nowrap;
+}
+
+.pipeline-stage-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 2px 0;
+}
+
+.pipeline-stage-detail {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-align: center;
+    max-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Connectors between stages */
+.pipeline-connector {
+    display: flex;
+    align-items: center;
+    width: 40px;
+    height: 2px;
+    background: var(--border);
+    position: relative;
+    overflow: hidden;
+    margin: 0 2px;
+    align-self: flex-start;
+    margin-top: 21px; /* center on icon */
+}
+
+.pipeline-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-blue);
+    animation: dotFlow 1.5s ease-in-out infinite;
+    opacity: 0;
+}
+
+.pipeline-connector .d1 { animation-delay: 0s; }
+.pipeline-connector .d2 { animation-delay: 0.5s; }
+
+@keyframes dotFlow {
+    0% { left: -6px; opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { left: calc(100% + 6px); opacity: 0; }
+}
+
+@keyframes dotFlowV {
+    0% { top: -6px; opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { top: calc(100% + 6px); opacity: 0; }
+}
+
+@keyframes stageReveal {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
 }
