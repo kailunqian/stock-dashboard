@@ -639,3 +639,119 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
     0%, 100% { opacity: 1; }
     50% { opacity: 0.4; }
 }
+
+/* Pipeline stage expand panel */
+.pipeline-stage { cursor: pointer; }
+.pipeline-stage:hover .pipeline-stage-icon { transform: scale(1.08); }
+
+.pipeline-stage-expand {
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.25s ease;
+    width: 180px;
+    text-align: left;
+    padding: 0 8px;
+}
+
+.pipeline-stage.expanded .pipeline-stage-expand {
+    max-height: 220px;
+    opacity: 1;
+    padding: 10px 8px 4px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 6px;
+}
+
+.pipeline-hint {
+    text-align: center;
+    font-size: 11px;
+    color: #484f58;
+    margin-top: 12px;
+}
+
+/* Tags inside expand panels */
+.pipe-tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(88, 166, 255, 0.12);
+    color: var(--accent-blue);
+    margin: 2px 2px;
+    white-space: nowrap;
+}
+
+.pipe-tag-social { background: rgba(188, 140, 255, 0.12); color: var(--accent-purple); }
+.pipe-tag-news { background: rgba(210, 153, 34, 0.12); color: var(--accent-yellow); }
+.pipe-tag-market { background: rgba(63, 185, 80, 0.12); color: var(--accent-green); }
+.pipe-tag-fundamental { background: rgba(248, 81, 73, 0.12); color: var(--accent-red); }
+.pipe-tag-llm { background: rgba(88, 166, 255, 0.15); color: #79b8ff; }
+.pipe-tag-macro { background: rgba(210, 153, 34, 0.12); color: var(--accent-yellow); }
+.pipe-tag-model { background: rgba(63, 185, 80, 0.12); color: var(--accent-green); }
+.pipe-tag-delivery { background: rgba(188, 140, 255, 0.12); color: var(--accent-purple); }
+
+/* Rows inside expand panels */
+.pipe-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-size: 11px;
+}
+
+.pipe-label {
+    color: var(--text-secondary);
+    text-transform: capitalize;
+}
+
+.pipe-badge {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: rgba(88, 166, 255, 0.1);
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.pipe-abbr {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-blue);
+    width: 30px;
+}
+
+.pipe-desc {
+    font-size: 10px;
+    color: var(--text-secondary);
+    flex: 1;
+    text-align: right;
+}
+
+/* Weight bar inside Scoring expand */
+.pipe-weight-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 10px;
+}
+
+.pipe-weight-row .pipe-label { min-width: 60px; font-size: 10px; }
+.pipe-weight-row .pipe-badge { min-width: 28px; text-align: right; }
+
+.pipe-weight-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.pipe-weight-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+    border-radius: 2px;
+    transition: width 0.6s ease;
+}

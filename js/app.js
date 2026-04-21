@@ -158,12 +158,20 @@ Router.register('/daily', async () => {
         </div>`;
     }
 
-    // Build animated pipeline data from real scan results
-    const scanned = scan.stocks_scanned || '~150';
-    const features = model.feature_count || 72;
-    const accuracy = model.accuracy ? `${(model.accuracy * 100).toFixed(0)}%` : '—';
-    const actionable = scan.actionable || 0;
-    const topPicks = scan.top_picks?.length || actionable;
+    // Build animated pipeline from API pipeline metadata
+    const pipe = data.pipeline || {};
+    const sources = pipe.sources || [];
+    const featGroups = pipe.features?.groups || [];
+    const strategies = pipe.strategies || [];
+    const mdlInfo = pipe.model || {};
+    const scoring = pipe.scoring || {};
+    const weights = scoring.weights || {};
+    const output = pipe.output || {};
+
+    const scanned = pipe.stocks_fetched || scan.stocks_scanned || '~150';
+    const features = pipe.features?.total || model.feature_count || 72;
+    const accuracy = (mdlInfo.accuracy || model.accuracy) ? `${((mdlInfo.accuracy || model.accuracy) * 100).toFixed(0)}%` : '—';
+    const topPicks = output.picks || scan.top_picks?.length || scan.actionable || 0;
 
     // SVG icons for each stage
     const icons = {
@@ -178,6 +186,31 @@ Router.register('/daily', async () => {
 
     const connector = `<div class="pipeline-connector"><div class="pipeline-dot d1"></div><div class="pipeline-dot d2"></div></div>`;
 
+    // Expanded detail builders
+    const sourceDetail = sources.map(s =>
+        `<span class="pipe-tag pipe-tag-${s.type}">${s.name}</span>`
+    ).join('') || '<span class="pipe-tag">Yahoo</span><span class="pipe-tag">News</span>';
+
+    const featureDetail = featGroups.map(g =>
+        `<div class="pipe-row"><span class="pipe-label">${g.name}</span><span class="pipe-badge">${g.count}</span></div>`
+    ).join('') || '';
+
+    const stratDetail = strategies.map(s =>
+        `<div class="pipe-row"><span class="pipe-abbr">${s.abbr}</span><span class="pipe-desc">${s.focus}</span></div>`
+    ).join('') || '';
+
+    const weightDetail = Object.entries(weights).map(([k, v]) =>
+        `<div class="pipe-weight-row"><span class="pipe-label">${k.replace('_', ' ')}</span><div class="pipe-weight-bar"><div class="pipe-weight-fill" style="width:${v * 100}%"></div></div><span class="pipe-badge">${(v * 100).toFixed(0)}%</span></div>`
+    ).join('') || '';
+
+    const modelComps = (mdlInfo.components || ['GBM', 'RF', 'LR']).map(c =>
+        `<span class="pipe-tag pipe-tag-model">${c}</span>`
+    ).join('');
+
+    const deliveryTags = (output.delivery || ['Telegram', 'Email', 'Dashboard']).map(d =>
+        `<span class="pipe-tag pipe-tag-delivery">${d}</span>`
+    ).join('');
+
     const pipelineHtml = `
     <div class="pipeline-container">
         <div class="pipeline-header">
@@ -185,55 +218,65 @@ Router.register('/daily', async () => {
             ${scan.scanned_at ? `<span style="margin-left:auto;font-size:11px">Last run: ${timeSince(scan.scanned_at)}</span>` : ''}
         </div>
         <div class="pipeline">
-            <div class="pipeline-stage active" style="animation-delay:0s">
+            <div class="pipeline-stage active" style="animation-delay:0s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon source">${icons.source}</div>
-                <div class="pipeline-stage-value">7</div>
+                <div class="pipeline-stage-value">${sources.length || 7}</div>
                 <div class="pipeline-stage-label">Data Sources</div>
-                <div class="pipeline-stage-detail">Yahoo, News, Social...</div>
+                <div class="pipeline-stage-expand">${sourceDetail}</div>
             </div>
             ${connector}
-            <div class="pipeline-stage active" style="animation-delay:0.15s">
+            <div class="pipeline-stage active" style="animation-delay:0.12s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon feature">${icons.feature}</div>
                 <div class="pipeline-stage-value">${scanned}</div>
-                <div class="pipeline-stage-label">Stocks Fetched</div>
-                <div class="pipeline-stage-detail">Discovery + Watchlist</div>
+                <div class="pipeline-stage-label">Stocks Scanned</div>
+                <div class="pipeline-stage-expand">
+                    <div class="pipe-row"><span class="pipe-desc">${pipe.discovery_method || 'Auto-discovery + Watchlist'}</span></div>
+                </div>
             </div>
             ${connector}
-            <div class="pipeline-stage active" style="animation-delay:0.3s">
+            <div class="pipeline-stage active" style="animation-delay:0.24s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon strategy">${icons.strategy}</div>
                 <div class="pipeline-stage-value">${features}</div>
                 <div class="pipeline-stage-label">Features</div>
-                <div class="pipeline-stage-detail">Tech + Fund + LLM + MI</div>
+                <div class="pipeline-stage-expand">${featureDetail}</div>
             </div>
             ${connector}
-            <div class="pipeline-stage active" style="animation-delay:0.45s">
+            <div class="pipeline-stage active" style="animation-delay:0.36s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon model">${icons.model}</div>
-                <div class="pipeline-stage-value">4</div>
+                <div class="pipeline-stage-value">${strategies.length || 4}</div>
                 <div class="pipeline-stage-label">Strategies</div>
-                <div class="pipeline-stage-detail">Mom · Val · Brk · Acc</div>
+                <div class="pipeline-stage-expand">${stratDetail}</div>
             </div>
             ${connector}
-            <div class="pipeline-stage active" style="animation-delay:0.6s">
+            <div class="pipeline-stage active" style="animation-delay:0.48s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon score">${icons.score}</div>
                 <div class="pipeline-stage-value">${accuracy}</div>
                 <div class="pipeline-stage-label">ML Ensemble</div>
-                <div class="pipeline-stage-detail">GBM + RF + LR</div>
+                <div class="pipeline-stage-expand">
+                    <div style="margin-bottom:6px">${modelComps}</div>
+                    ${mdlInfo.version ? `<div class="pipe-row"><span class="pipe-label">Version</span><span class="pipe-badge">${mdlInfo.version}</span></div>` : ''}
+                    ${mdlInfo.samples ? `<div class="pipe-row"><span class="pipe-label">Samples</span><span class="pipe-badge">${mdlInfo.samples.toLocaleString()}</span></div>` : ''}
+                </div>
             </div>
             ${connector}
-            <div class="pipeline-stage active" style="animation-delay:0.75s">
+            <div class="pipeline-stage active" style="animation-delay:0.6s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon filter">${icons.filter}</div>
-                <div class="pipeline-stage-value">≥75</div>
-                <div class="pipeline-stage-label">Score Filter</div>
-                <div class="pipeline-stage-detail">Buy threshold</div>
+                <div class="pipeline-stage-value">≥${scoring.threshold || 75}</div>
+                <div class="pipeline-stage-label">Weighted Score</div>
+                <div class="pipeline-stage-expand">${weightDetail}</div>
             </div>
             ${connector}
-            <div class="pipeline-stage active" style="animation-delay:0.9s">
+            <div class="pipeline-stage active" style="animation-delay:0.72s" onclick="this.classList.toggle('expanded')">
                 <div class="pipeline-stage-icon output">${icons.output}</div>
                 <div class="pipeline-stage-value">${topPicks}</div>
                 <div class="pipeline-stage-label">Top Picks</div>
-                <div class="pipeline-stage-detail">${scan.top_pick ? `Best: ${scan.top_pick}` : 'Ranked by score'}</div>
+                <div class="pipeline-stage-expand">
+                    ${output.top_pick ? `<div class="pipe-row"><span class="pipe-label">Best</span><span class="pipe-badge">${output.top_pick}${output.top_score ? ` (${output.top_score.toFixed(0)})` : ''}</span></div>` : ''}
+                    <div style="margin-top:4px">${deliveryTags}</div>
+                </div>
             </div>
         </div>
+        <div class="pipeline-hint">Click any stage to expand details</div>
     </div>`;
 
     return `
