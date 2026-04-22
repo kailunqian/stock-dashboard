@@ -197,17 +197,18 @@ Router.register('/daily', async () => {
                 <td>${p.current_price ? '$' + p.current_price.toFixed(2) : '—'}</td>
                 <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : '—'}</td>
                 <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
+                <td class="hide-mobile">${p.position_size ? p.position_size.position_pct + '%' : '—'}</td>
                 <td class="hide-mobile">${convBadge}</td>
                 <td class="hide-mobile">${scoreBar(p)}</td>
                 <td>${(p.signals || []).slice(0, 2).join(', ') || '—'}</td>
             </tr>`;
         }).join('');
     } else if (scan.stocks_scanned) {
-        picksHtml = `<tr><td colspan="9" style="text-align:center;color:var(--text-secondary)">
+        picksHtml = `<tr><td colspan="10" style="text-align:center;color:var(--text-secondary)">
             No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
         </td></tr>`;
     } else {
-        picksHtml = '<tr><td colspan="9" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
+        picksHtml = '<tr><td colspan="10" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
     }
 
     // Training status section
@@ -369,7 +370,7 @@ Router.register('/daily', async () => {
             <thead>
                 <tr>
                     <th>Symbol</th><th>Rating</th><th>Score</th>
-                    <th>Price</th><th>Buy At</th><th>Target</th>
+                    <th>Price</th><th>Buy At</th><th>Target</th><th class="hide-mobile">Size</th>
                     <th class="hide-mobile">30d Record</th><th class="hide-mobile">Breakdown</th><th>Signals</th>
                 </tr>
             </thead>
@@ -457,6 +458,84 @@ Router.register('/performance', async () => {
             ${scorer.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:8px">Training samples: ${scorer.training_samples}</div>` : ''}
             ${mm.symbols_analyzed ? `<div style="font-size:13px;color:var(--text-secondary)">Symbols analyzed: ${mm.symbols_analyzed}</div>` : ''}
             ${mm.feature_count ? `<div style="font-size:13px;color:var(--text-secondary)">Features: ${mm.feature_count}</div>` : ''}
+        </div>`;
+    }
+
+    // Walk-forward validation section
+    let walkForwardHtml = '';
+    const wf = data.walk_forward;
+    if (wf && wf.status === 'ok' && wf.overall) {
+        const o = wf.overall;
+        const edgeColor = o.edge > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+        const outperforms = o.high_outperforms ? '✅ High scores outperform' : '⚠️ Edge not established';
+
+        walkForwardHtml = `
+        <div class="card">
+            <div class="card-title">Walk-Forward Validation</div>
+            <div style="display:flex;gap:24px;margin-bottom:12px">
+                <div>
+                    <div style="font-size:24px;font-weight:bold;color:${edgeColor}">${(o.edge * 100).toFixed(1)}%</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">Edge (High - Low)</div>
+                </div>
+                <div>
+                    <div style="font-size:24px;font-weight:bold">${(o.high_score_hit_rate * 100).toFixed(0)}%</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">High Score Hit Rate</div>
+                </div>
+                <div>
+                    <div style="font-size:24px;font-weight:bold">${(o.low_score_hit_rate * 100).toFixed(0)}%</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">Low Score Hit Rate</div>
+                </div>
+                <div>
+                    <div style="font-size:24px;font-weight:bold">${o.total_predictions}</div>
+                    <div style="font-size:12px;color:var(--text-secondary)">Predictions</div>
+                </div>
+            </div>
+            <div style="font-size:13px;color:var(--text-secondary)">${outperforms}</div>
+            ${wf.windows && wf.windows.length > 0 ? `
+            <details style="margin-top:8px">
+                <summary style="cursor:pointer;font-size:13px;color:var(--accent-blue)">Weekly breakdown (${wf.windows.length} weeks)</summary>
+                <div class="table-container" style="margin-top:8px">
+                    <table>
+                        <thead><tr><th>Week</th><th>High Score</th><th>Low Score</th><th>Edge</th></tr></thead>
+                        <tbody>
+                            ${wf.windows.slice(-8).map(w => {
+                                const edge = w.high_hit_rate != null && w.low_hit_rate != null ? (w.high_hit_rate - w.low_hit_rate) : null;
+                                return `<tr>
+                                    <td>${w.week}</td>
+                                    <td>${w.high_hit_rate != null ? (w.high_hit_rate * 100).toFixed(0) + '%' : '—'} (${w.high_score_count})</td>
+                                    <td>${w.low_hit_rate != null ? (w.low_hit_rate * 100).toFixed(0) + '%' : '—'} (${w.low_score_count})</td>
+                                    <td class="${edge > 0 ? 'positive' : edge < 0 ? 'negative' : ''}">${edge != null ? (edge * 100).toFixed(1) + '%' : '—'}</td>
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </details>` : ''}
+        </div>`;
+    }
+
+    // Signal accuracy section
+    let signalAccuracyHtml = '';
+    const sa = data.signal_accuracy;
+    if (sa && sa.signals_tracked > 0) {
+        const topSignals = sa.top_signals || [];
+        signalAccuracyHtml = `
+        <div class="card">
+            <div class="card-title">Signal Accuracy (${sa.signals_tracked} signals tracked)</div>
+            ${topSignals.length > 0 ? `
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Signal</th><th>Hit Rate</th><th>Samples</th></tr></thead>
+                    <tbody>
+                        ${topSignals.map(([name, rate, count]) => `
+                        <tr>
+                            <td>${name.replace(/_/g, ' ')}</td>
+                            <td><span class="${rate >= 0.55 ? 'positive' : rate < 0.45 ? 'negative' : ''}">${(rate * 100).toFixed(0)}%</span></td>
+                            <td>${count}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>` : '<div style="color:var(--text-secondary);font-size:13px">Collecting signal data...</div>'}
         </div>`;
     }
 
@@ -587,6 +666,8 @@ Router.register('/performance', async () => {
         ${modelHtml}
         ${scorerHtml}
     </div>
+    ${walkForwardHtml}
+    ${signalAccuracyHtml}
     ${strategyHtml}
     ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
     <div class="card-grid">
