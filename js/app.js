@@ -167,48 +167,45 @@ Router.register('/daily', async () => {
     const training = data.training || {};
     const model = data.model || {};
 
-    // Build unified picks table merging today's scan + 30-day conviction
-    const conviction = data.conviction || [];
-    const convMap = {};
-    conviction.forEach(c => { convMap[c.symbol] = c; });
+    // Market regime banner
+    const regime = scan.market_regime;
+    let regimeBanner = '';
+    if (regime) {
+        const colors = { bull: '#15803d', bear: '#dc3545', sideways: '#b8860b' };
+        const icons = { bull: '🐂', bear: '🐻', sideways: '↔️' };
+        const bgColors = { bull: '#f0fdf4', bear: '#fef2f2', sideways: '#fefce8' };
+        regimeBanner = `
+        <div style="background:${bgColors[regime.regime]};border-left:4px solid ${colors[regime.regime]};padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:16px">
+            <span style="font-size:18px">${icons[regime.regime]}</span>
+            <strong style="color:${colors[regime.regime]}">${regime.regime.toUpperCase()} Market</strong>
+            <span style="color:var(--text-secondary);margin-left:12px;font-size:13px">${regime.description || ''}</span>
+            ${regime.vix ? `<span style="float:right;font-size:13px">VIX: ${regime.vix}</span>` : ''}
+        </div>`;
+    }
 
+    // Today's picks only — no conviction/historical mixing
     let picksHtml = '';
     if (scan.top_picks && scan.top_picks.length > 0) {
-        // Merge today's picks with conviction history
-        const mergedPicks = scan.top_picks.map(p => {
-            const c = convMap[p.symbol];
-            return { ...p, conv: c || null };
-        });
-        // Add conviction-only stocks not in today's scan (tracked ≥3 days, avg ≥70)
-        conviction.filter(c => !scan.top_picks.some(p => p.symbol === c.symbol) && c.appearances >= 3 && c.avg_score >= 70)
-            .slice(0, 5)
-            .forEach(c => mergedPicks.push({ symbol: c.symbol, score: c.latest_score, conviction_only: true, conv: c }));
-
-        picksHtml = mergedPicks.map(p => {
-            const c = p.conv;
-            const convBadge = c ? `<span title="${c.appearances}d tracked, ${c.high_count}× strong" style="font-size:11px;padding:2px 5px;border-radius:8px;background:${c.avg_score>=75?'var(--green-bg)':c.avg_score>=60?'var(--yellow-bg)':'var(--red-bg)'};color:${c.avg_score>=75?'var(--green)':c.avg_score>=60?'var(--yellow)':'var(--red)'}">${c.avg_score}avg · ${c.high_count}× · ${c.trend === 'up' ? '📈' : c.trend === 'down' ? '📉' : '➡️'}</span>` : '<span style="font-size:11px;color:var(--text-secondary)">new</span>';
-            const rowStyle = p.conviction_only ? 'opacity:0.7;font-style:italic' : 'cursor:pointer';
-            const tag = p.conviction_only ? '<span style="font-size:10px;color:var(--text-secondary)"> (watch)</span>' : '';
+        picksHtml = scan.top_picks.map(p => {
+            const keySignal = (p.signals || [])[0] || '—';
             return `
-            <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="${rowStyle}">
-                <td><strong>${p.symbol}</strong>${tag}</td>
-                <td>${p.recommendation ? recPill(p.recommendation) : pill('Track', 'blue')}</td>
+            <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="cursor:pointer">
+                <td><strong>${p.symbol}</strong></td>
+                <td>${p.recommendation ? recPill(p.recommendation) : '—'}</td>
                 <td>${p.score?.toFixed(0) || '—'}</td>
-                <td>${p.current_price ? '$' + p.current_price.toFixed(2) : '—'}</td>
-                <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : '—'}</td>
+                <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : (p.current_price ? '$' + p.current_price.toFixed(2) : '—')}</td>
                 <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
+                <td>${p.stop_loss ? '$' + p.stop_loss.toFixed(2) : '—'}</td>
                 <td class="hide-mobile">${p.position_size ? p.position_size.position_pct + '%' : '—'}</td>
-                <td class="hide-mobile">${convBadge}</td>
-                <td class="hide-mobile">${scoreBar(p)}</td>
-                <td>${(p.signals || []).slice(0, 2).join(', ') || '—'}</td>
+                <td>${keySignal}</td>
             </tr>`;
         }).join('');
     } else if (scan.stocks_scanned) {
-        picksHtml = `<tr><td colspan="10" style="text-align:center;color:var(--text-secondary)">
+        picksHtml = `<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">
             No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
         </td></tr>`;
     } else {
-        picksHtml = '<tr><td colspan="10" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
+        picksHtml = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
     }
 
     // Training status section
@@ -333,23 +330,25 @@ Router.register('/daily', async () => {
     // Store graph data for post-render hydration
     window._dagGraphData = (pipe.graph && pipe.graph.version >= 2) ? pipe.graph : null;
 
+    const strongBuyCount = (scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length;
+
     return `
     <div class="page-title">Daily Report</div>
 
-    ${pipelineHtml}
+    ${regimeBanner}
 
     <div class="card-grid">
+        <div class="card" style="border-left:4px solid var(--accent-green);${strongBuyCount > 0 ? 'background:var(--green-bg, #f0fdf4)' : ''}">
+            <div class="card-title">🔥 Strong Buy</div>
+            <div class="card-value positive" style="font-size:32px">${strongBuyCount}</div>
+            <div class="card-subtitle">Score ≥ 85, no risks</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${scan.actionable || 0} actionable total (≥70)</div>
+        </div>
         <div class="card">
             <div class="card-title">Stocks Scanned</div>
             <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
             <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
             ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary)">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
-        </div>
-        <div class="card">
-            <div class="card-title">Strong Buy</div>
-            <div class="card-value positive">${(scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length}</div>
-            <div class="card-subtitle">Score ≥ 85, no risks</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${scan.actionable || 0} actionable (≥70)</div>
         </div>
         <div class="card">
             <div class="card-title">Top Pick</div>
@@ -364,14 +363,16 @@ Router.register('/daily', async () => {
         ${trainingHtml}
     </div>
 
+    ${pipelineHtml}
+
     <div class="table-container">
-        <div class="table-header">Today's Picks + 30-Day Track Record</div>
+        <div class="table-header">Today's Picks</div>
         <table>
             <thead>
                 <tr>
-                    <th>Symbol</th><th>Rating</th><th>Score</th>
-                    <th>Price</th><th>Buy At</th><th>Target</th><th class="hide-mobile">Size</th>
-                    <th class="hide-mobile">30d Record</th><th class="hide-mobile">Breakdown</th><th>Signals</th>
+                    <th>Symbol</th><th>Rec</th><th>Score</th>
+                    <th>Entry</th><th>Target</th><th>Stop</th><th class="hide-mobile">Size</th>
+                    <th>Key Signal</th>
                 </tr>
             </thead>
             <tbody>${picksHtml}</tbody>
@@ -621,6 +622,54 @@ Router.register('/performance', async () => {
         }
     }
 
+    // Conviction tracker (30-day track record — moved from Daily page)
+    const conviction = data.conviction || [];
+    let convictionHtml = '';
+    if (conviction.length > 0) {
+        convictionHtml = renderConvictionTracker(conviction);
+    }
+
+    // Recent Picks History (30 days)
+    let recentPicksHtml = '';
+    const recentPicks = data.recent_picks || [];
+    if (recentPicks.length > 0) {
+        const wins = recentPicks.filter(p => p.hit === true).length;
+        const losses = recentPicks.filter(p => p.hit === false).length;
+        const pending = recentPicks.filter(p => p.hit === null).length;
+
+        recentPicksHtml = `
+        <div class="card" style="grid-column:1/-1">
+            <div class="card-title">Recent Picks (Last 30 Days)</div>
+            <div style="display:flex;gap:24px;margin-bottom:12px">
+                <div><span style="font-size:20px;font-weight:bold;color:var(--accent-green)">${wins}</span> <span style="font-size:12px;color:var(--text-secondary)">Winners</span></div>
+                <div><span style="font-size:20px;font-weight:bold;color:var(--accent-red)">${losses}</span> <span style="font-size:12px;color:var(--text-secondary)">Losers</span></div>
+                <div><span style="font-size:20px;font-weight:bold">${pending}</span> <span style="font-size:12px;color:var(--text-secondary)">Pending</span></div>
+                ${wins + losses > 0 ? `<div><span style="font-size:20px;font-weight:bold">${((wins/(wins+losses))*100).toFixed(0)}%</span> <span style="font-size:12px;color:var(--text-secondary)">Win Rate</span></div>` : ''}
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead><tr><th>Date</th><th>Symbol</th><th>Score</th><th>Entry</th><th>1D</th><th>7D</th><th>30D</th><th>Result</th></tr></thead>
+                    <tbody>
+                        ${recentPicks.map(p => {
+                            const resultIcon = p.hit === true ? '✅' : p.hit === false ? '❌' : '⏳';
+                            const date = p.signal_date ? new Date(p.signal_date).toLocaleDateString('en-US', {month:'short', day:'numeric'}) : '—';
+                            return `<tr>
+                                <td>${date}</td>
+                                <td><a href="#/stock/${p.symbol}" style="color:var(--accent-blue)">${p.symbol}</a></td>
+                                <td>${p.score?.toFixed(0) || '—'}</td>
+                                <td>$${p.entry_price?.toFixed(2) || '—'}</td>
+                                <td class="${pctClass(p.return_1d || 0)}">${p.return_1d != null ? pctSign(p.return_1d) : '—'}</td>
+                                <td class="${pctClass(p.return_7d || 0)}">${p.return_7d != null ? pctSign(p.return_7d) : '—'}</td>
+                                <td class="${pctClass(p.return_30d || 0)}">${p.return_30d != null ? pctSign(p.return_30d) : '—'}</td>
+                                <td>${resultIcon}</td>
+                            </tr>`;
+                        }).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>`;
+    }
+
     // Strategy leaderboard
     const strategies = data.strategies || [];
     let strategyHtml = '';
@@ -668,6 +717,8 @@ Router.register('/performance', async () => {
     </div>
     ${walkForwardHtml}
     ${signalAccuracyHtml}
+    ${convictionHtml}
+    ${recentPicksHtml}
     ${strategyHtml}
     ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
     <div class="card-grid">
