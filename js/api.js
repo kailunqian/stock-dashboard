@@ -26,6 +26,29 @@ const API = {
         return resp.json();
     },
 
+    async fetchWithCache(cachePath, livePath) {
+        // Try cache first (fast — served from blob, no cold start or DB queries)
+        try {
+            const cacheRes = await fetch(`${this.base}/api/cache/${cachePath}`, {
+                headers: this.headers(),
+            });
+            if (cacheRes.status === 401) {
+                this.token = '';
+                localStorage.removeItem('session_token');
+                window.location.hash = '#/login';
+                return null;
+            }
+            if (cacheRes.ok) {
+                return await cacheRes.json();
+            }
+        } catch (e) {
+            // Cache miss — fall through to live
+        }
+
+        // Fall back to live API
+        return this.fetch(livePath);
+    },
+
     // Auth
     async login(email) {
         return fetch(`${this.base}/api/dashboard/auth/login`, {
@@ -53,9 +76,10 @@ const API = {
         localStorage.removeItem('session_token');
     },
 
-    // Data endpoints
-    daily()       { return this.fetch('dashboard/daily'); },
-    performance() { return this.fetch('dashboard/performance'); },
+    // Data endpoints (cached where available)
+    daily()       { return this.fetchWithCache('daily', 'dashboard/daily'); },
+    performance() { return this.fetchWithCache('performance', 'dashboard/performance'); },
+    performanceHistory(days = 90) { return this.fetch(`dashboard/performance/history?days=${days}`); },
     stock(sym)    { return this.fetch(`dashboard/stock/${sym}`); },
     budget()      { return this.fetch('dashboard/budget'); },
     system()      { return this.fetch('dashboard/system'); },
