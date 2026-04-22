@@ -38,6 +38,8 @@ const Router = {
                 main.innerHTML = await handler();
                 // Post-render: hydrate DAG if present
                 _hydrateDag(main);
+                // Post-render: load performance charts if on performance page
+                if (path === '/performance') loadPerformanceCharts(90);
             } catch (e) {
                 main.innerHTML = `<div class="card" style="margin:40px auto;max-width:500px;text-align:center">
                     <h3>⚠️ Error</h3><p style="color:var(--text-secondary)">${e.message}</p></div>`;
@@ -728,8 +730,143 @@ Router.register('/performance', async () => {
             ${scorecardCard('all', sc.all)}
             ${calibrationHtml}
         ` : emptyHtml}
+    </div>
+    <div id="performance-charts" class="charts-section">
+        <h2>📈 Performance Trends</h2>
+        <div class="chart-timeframe">
+            <button onclick="loadPerformanceCharts(30)">30 Days</button>
+            <button class="active" onclick="loadPerformanceCharts(90)">90 Days</button>
+            <button onclick="loadPerformanceCharts(365)">1 Year</button>
+        </div>
     </div>`;
 });
+
+async function loadPerformanceCharts(days = 90) {
+    try {
+        const data = await API.performanceHistory(days);
+        if (!data || !data.metrics) return;
+
+        const section = document.getElementById('performance-charts');
+        if (!section) return;
+
+        // Preserve header and buttons, clear chart wrappers
+        const existing = section.querySelectorAll('.chart-wrapper');
+        existing.forEach(el => el.remove());
+
+        // Update active button
+        section.querySelectorAll('.chart-timeframe button').forEach(b => {
+            b.classList.toggle('active',
+                (days === 30 && b.textContent.includes('30')) ||
+                (days === 90 && b.textContent.includes('90')) ||
+                (days === 365 && b.textContent.includes('Year'))
+            );
+        });
+
+        const metrics = data.metrics;
+        if (Object.keys(metrics).length === 0) {
+            const p = document.createElement('p');
+            p.className = 'empty-state';
+            p.textContent = 'Performance data will appear after a few days of tracking.';
+            section.appendChild(p);
+            return;
+        }
+
+        renderPerformanceCharts(metrics);
+    } catch (e) {
+        console.warn('Chart load failed:', e);
+    }
+}
+
+function createChartCanvas(id, title, parent) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'chart-wrapper';
+    wrapper.innerHTML = `<h3 class="chart-title">${title}</h3><div class="chart-container"><canvas id="${id}"></canvas></div>`;
+    parent.appendChild(wrapper);
+    return document.getElementById(id);
+}
+
+function renderPerformanceCharts(metrics) {
+    const chartSection = document.getElementById('performance-charts');
+    if (!chartSection) return;
+
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { intersect: false, mode: 'index' },
+        scales: {
+            x: { type: 'category', grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b949e', maxRotation: 45 } },
+            y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b949e' } }
+        },
+        plugins: { legend: { labels: { color: '#e6edf3' } } }
+    };
+
+    // Chart 1: ML Accuracy
+    if (metrics.ml_accuracy || metrics.model_backtest_accuracy) {
+        const canvas1 = createChartCanvas('ml-accuracy-chart', 'ML Model Accuracy (%)', chartSection);
+        const datasets = [];
+        if (metrics.ml_accuracy) {
+            datasets.push({
+                label: 'Live Accuracy', data: metrics.ml_accuracy.map(d => ({ x: d.date, y: d.value })),
+                borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.1)', fill: true, tension: 0.3
+            });
+        }
+        if (metrics.model_backtest_accuracy) {
+            datasets.push({
+                label: 'Backtest Accuracy', data: metrics.model_backtest_accuracy.map(d => ({ x: d.date, y: d.value })),
+                borderColor: '#bc8cff', borderDash: [5, 5], tension: 0.3
+            });
+        }
+        new Chart(canvas1, { type: 'line', data: { datasets }, options: {
+            ...commonOptions,
+            scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, min: 40, max: 100,
+                ticks: { ...commonOptions.scales.y.ticks, callback: v => v + '%' } } }
+        }});
+    }
+
+    // Chart 2: Recommendation Hit Rate
+    if (metrics.recommendation_hit_rate) {
+        const canvas2 = createChartCanvas('hit-rate-chart', 'Recommendation Hit Rate (%)', chartSection);
+        new Chart(canvas2, { type: 'line', data: {
+            datasets: [{
+                label: 'Hit Rate (7d)', data: metrics.recommendation_hit_rate.map(d => ({ x: d.date, y: d.value })),
+                borderColor: '#d29922', backgroundColor: 'rgba(210,153,34,0.1)', fill: true, tension: 0.3
+            }]
+        }, options: {
+            ...commonOptions,
+            scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, min: 0, max: 100,
+                ticks: { ...commonOptions.scales.y.ticks, callback: v => v + '%' } } }
+        }});
+    }
+
+    // Chart 3: Avg Profit per Pick
+    if (metrics.recommendation_profit_7d) {
+        const canvas3 = createChartCanvas('profit-chart', 'Avg 7-Day Return per Pick (%)', chartSection);
+        const profitData = metrics.recommendation_profit_7d;
+        new Chart(canvas3, { type: 'bar', data: {
+            labels: profitData.map(d => d.date),
+            datasets: [{
+                label: 'Avg Return %', data: profitData.map(d => d.value),
+                backgroundColor: profitData.map(d => d.value >= 0 ? 'rgba(63,185,80,0.7)' : 'rgba(248,81,73,0.7)'),
+                borderColor: profitData.map(d => d.value >= 0 ? '#3fb950' : '#f85149'), borderWidth: 1
+            }]
+        }, options: {
+            ...commonOptions,
+            scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y,
+                ticks: { ...commonOptions.scales.y.ticks, callback: v => v.toFixed(2) + '%' } } }
+        }});
+    }
+
+    // Chart 4: Cumulative Portfolio
+    if (metrics.portfolio_cumulative_30d) {
+        const canvas4 = createChartCanvas('cumulative-chart', 'Cumulative 30-Day Return (%)', chartSection);
+        new Chart(canvas4, { type: 'line', data: {
+            datasets: [{
+                label: 'Cumulative Return', data: metrics.portfolio_cumulative_30d.map(d => ({ x: d.date, y: d.value })),
+                borderColor: '#bc8cff', backgroundColor: 'rgba(188,140,255,0.1)', fill: true, tension: 0.3, pointRadius: 4
+            }]
+        }, options: commonOptions });
+    }
+}
 
 // ── Stock Detail Page (Decision Flow) ───────────────────────────────
 

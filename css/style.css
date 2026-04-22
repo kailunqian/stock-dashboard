@@ -845,3 +845,19 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
         margin-top: 4px;
     }
 }
+
+/* Performance Charts */
+.charts-section { margin-top: 24px; }
+.charts-section h2 { color: var(--text-primary); font-size: 18px; margin-bottom: 12px; }
+.chart-timeframe { display: flex; gap: 8px; margin-bottom: 16px; }
+.chart-timeframe button {
+    background: var(--bg-secondary); border: 1px solid var(--border); color: var(--text-secondary);
+    padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; transition: all 0.2s;
+}
+.chart-timeframe button.active,
+.chart-timeframe button:hover { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+.chart-wrapper { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+.chart-title { color: var(--text-primary); font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+.chart-container { position: relative; height: 300px; }
+.chart-container canvas { max-height: 300px; }
+.empty-state { color: var(--text-secondary); text-align: center; padding: 40px 20px; font-size: 14px; }
