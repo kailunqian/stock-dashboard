@@ -39,7 +39,16 @@ const Router = {
                 // Post-render: hydrate DAG if present
                 _hydrateDag(main);
                 // Post-render: load performance charts if on performance page
-                if (path === '/performance') loadPerformanceCharts(90);
+                if (path === '/performance') {
+                    loadPerformanceCharts(90);
+                    // Wire up timeframe buttons via event delegation
+                    const chartSection = document.getElementById('performance-charts');
+                    if (chartSection) {
+                        chartSection.querySelectorAll('.chart-timeframe button[data-days]').forEach(btn => {
+                            btn.addEventListener('click', () => loadPerformanceCharts(parseInt(btn.dataset.days)));
+                        });
+                    }
+                }
             } catch (e) {
                 main.innerHTML = `<div class="card" style="margin:40px auto;max-width:500px;text-align:center">
                     <h3>⚠️ Error</h3><p style="color:var(--text-secondary)">${e.message}</p></div>`;
@@ -734,9 +743,9 @@ Router.register('/performance', async () => {
     <div id="performance-charts" class="charts-section">
         <h2>📈 Performance Trends</h2>
         <div class="chart-timeframe">
-            <button onclick="loadPerformanceCharts(30)">30 Days</button>
-            <button class="active" onclick="loadPerformanceCharts(90)">90 Days</button>
-            <button onclick="loadPerformanceCharts(365)">1 Year</button>
+            <button data-days="30">30 Days</button>
+            <button data-days="90" class="active">90 Days</button>
+            <button data-days="365">1 Year</button>
         </div>
     </div>`;
 });
@@ -749,17 +758,18 @@ async function loadPerformanceCharts(days = 90) {
         const section = document.getElementById('performance-charts');
         if (!section) return;
 
-        // Preserve header and buttons, clear chart wrappers
-        const existing = section.querySelectorAll('.chart-wrapper');
-        existing.forEach(el => el.remove());
+        // Destroy existing Chart.js instances before removing canvases
+        section.querySelectorAll('canvas').forEach(c => {
+            const chart = Chart.getChart(c);
+            if (chart) chart.destroy();
+        });
+
+        // Preserve header and buttons, clear chart wrappers + empty states
+        section.querySelectorAll('.chart-wrapper, .empty-state').forEach(el => el.remove());
 
         // Update active button
         section.querySelectorAll('.chart-timeframe button').forEach(b => {
-            b.classList.toggle('active',
-                (days === 30 && b.textContent.includes('30')) ||
-                (days === 90 && b.textContent.includes('90')) ||
-                (days === 365 && b.textContent.includes('Year'))
-            );
+            b.classList.toggle('active', parseInt(b.dataset.days) === days);
         });
 
         const metrics = data.metrics;
