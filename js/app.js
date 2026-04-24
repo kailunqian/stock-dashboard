@@ -233,7 +233,62 @@ Router.register('/daily', async () => {
         </div>`;
     }
 
-    // Build compact pipeline from API data
+    const strongBuyCount = (scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length;
+
+    return `
+    <div class="page-title">Daily Report</div>
+
+    ${regimeBanner}
+
+    <div class="card-grid">
+        <div class="card" style="border-left:4px solid var(--accent-green);${strongBuyCount > 0 ? 'background:var(--green-bg, #f0fdf4)' : ''}">
+            <div class="card-title">🔥 Strong Buy</div>
+            <div class="card-value positive" style="font-size:32px">${strongBuyCount}</div>
+            <div class="card-subtitle">Score ≥ 85, no risks</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${scan.actionable || 0} actionable total (≥70)</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Stocks Scanned</div>
+            <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
+            <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
+            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary)">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
+        </div>
+        <div class="card">
+            <div class="card-title">Top Pick</div>
+            <div class="card-value neutral">${scan.top_pick || '—'}</div>
+            <div class="card-subtitle">Score: ${scan.top_score?.toFixed(0) || '—'}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">ML Model</div>
+            <div class="card-value neutral">${model.version || training.model_version || '—'}</div>
+            <div class="card-subtitle">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
+        </div>
+        ${trainingHtml}
+    </div>
+
+    <div class="table-container">
+        <div class="table-header">Today's Picks</div>
+        <table>
+            <thead>
+                <tr>
+                    <th>Symbol</th><th>Rec</th><th>Score</th>
+                    <th>Entry</th><th>Target</th><th>Stop</th><th class="hide-mobile">Size</th>
+                    <th>Key Signal</th>
+                </tr>
+            </thead>
+            <tbody>${picksHtml}</tbody>
+        </table>
+    </div>`;
+});
+
+// ── Pipeline Page ───────────────────────────────────────────────────
+
+Router.register('/pipeline', async () => {
+    const data = await API.daily();
+    if (!data) return '<p>Failed to load pipeline data</p>';
+
+    const scan = data.scan || {};
+    const model = data.model || {};
     const pipe = data.pipeline || {};
     const sources = pipe.sources || [];
     const featGroups = pipe.features?.groups || [];
@@ -248,7 +303,6 @@ Router.register('/daily', async () => {
     const accuracy = (mdlInfo.accuracy || model.accuracy) ? `${((mdlInfo.accuracy || model.accuracy) * 100).toFixed(0)}%` : '—';
     const topPicks = output.picks || scan.top_picks?.length || scan.actionable || 0;
 
-    // Pipeline header (shared between old linear and new DAG view)
     const pipelineHeader = `<div class="pipeline-header">
         <span class="pipeline-live"></span> Analysis Pipeline
         ${scan.scanned_at ? `<span style="margin-left:auto;font-size:11px">Last run: ${timeSince(scan.scanned_at)}</span>` : ''}
@@ -256,11 +310,9 @@ Router.register('/daily', async () => {
 
     let pipelineHtml;
 
-    // v2 DAG renderer (if graph data available)
     if (pipe.graph && pipe.graph.version >= 2) {
         pipelineHtml = `<div class="pipeline-container">${pipelineHeader}<div class="dag-container" id="dag-root"></div></div>`;
     } else {
-        // Fallback: legacy linear pipeline
         const arrow = '<span class="pipeline-arrow">→</span>';
         const srcTags = sources.map(s => {
             const cls = {market:'t-green',social:'t-purple',news:'t-yellow',fundamental:'t-red',llm:'',macro:'t-yellow'}[s.type] || '';
@@ -341,54 +393,9 @@ Router.register('/daily', async () => {
     // Store graph data for post-render hydration
     window._dagGraphData = (pipe.graph && pipe.graph.version >= 2) ? pipe.graph : null;
 
-    const strongBuyCount = (scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length;
-
     return `
-    <div class="page-title">Daily Report</div>
-
-    ${regimeBanner}
-
-    <div class="card-grid">
-        <div class="card" style="border-left:4px solid var(--accent-green);${strongBuyCount > 0 ? 'background:var(--green-bg, #f0fdf4)' : ''}">
-            <div class="card-title">🔥 Strong Buy</div>
-            <div class="card-value positive" style="font-size:32px">${strongBuyCount}</div>
-            <div class="card-subtitle">Score ≥ 85, no risks</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${scan.actionable || 0} actionable total (≥70)</div>
-        </div>
-        <div class="card">
-            <div class="card-title">Stocks Scanned</div>
-            <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
-            <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
-            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary)">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
-        </div>
-        <div class="card">
-            <div class="card-title">Top Pick</div>
-            <div class="card-value neutral">${scan.top_pick || '—'}</div>
-            <div class="card-subtitle">Score: ${scan.top_score?.toFixed(0) || '—'}</div>
-        </div>
-        <div class="card">
-            <div class="card-title">ML Model</div>
-            <div class="card-value neutral">${model.version || training.model_version || '—'}</div>
-            <div class="card-subtitle">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
-        </div>
-        ${trainingHtml}
-    </div>
-
-    ${pipelineHtml}
-
-    <div class="table-container">
-        <div class="table-header">Today's Picks</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Symbol</th><th>Rec</th><th>Score</th>
-                    <th>Entry</th><th>Target</th><th>Stop</th><th class="hide-mobile">Size</th>
-                    <th>Key Signal</th>
-                </tr>
-            </thead>
-            <tbody>${picksHtml}</tbody>
-        </table>
-    </div>`;
+    <div class="page-title">Analysis Pipeline</div>
+    ${pipelineHtml}`;
 });
 
 // ── Performance Page ────────────────────────────────────────────────
