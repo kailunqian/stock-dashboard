@@ -169,19 +169,28 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
 }
 
 .nav-brand {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
     color: var(--text-primary);
     margin-right: 36px;
     text-decoration: none;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 10px;
     letter-spacing: -0.015em;
+    line-height: 1.4;
+    padding-bottom: 2px;
+}
+
+.nav-brand-text {
     background: var(--gradient-accent);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    color: transparent;
+    display: inline-block;
+    line-height: 1.4;
+    padding: 0 0.05em 0.12em;
 }
 
 .nav-logo {
@@ -255,41 +264,70 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
     .bottom-nav { display: none; }
 
 /* Main content */
-.main { max-width: 1240px; margin: 0 auto; padding: 36px 28px 80px; }
+.main { max-width: 1280px; margin: 0 auto; padding: 40px 32px 96px; }
 
+/* Page title — large display headline. Wrapped in inline-block + padding
+   to prevent gradient-text descender clipping (g/y/p/q letters). */
 .page-title {
     font-family: var(--font-display);
-    font-size: 38px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.1;
-    margin-bottom: 28px;
+    font-size: clamp(28px, 4.2vw, 48px);
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+    margin-bottom: 32px;
     display: flex;
-    align-items: center;
+    flex-wrap: wrap;
+    align-items: baseline;
     gap: 14px;
     background: linear-gradient(180deg, #FFFFFF 0%, #B4B7BD 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    color: transparent;
+    padding-bottom: 0.1em;
+}
+
+/* Optional eyebrow above page title — pages can inject this */
+.page-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent-hover);
+    margin-bottom: 8px;
+    padding: 6px 12px 6px 10px;
+    background: var(--accent-soft);
+    border: 1px solid rgba(94,106,210,0.2);
+    border-radius: var(--radius-pill);
+}
+.page-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--gradient-accent);
+    box-shadow: 0 0 8px rgba(139,92,246,0.7);
 }
 
 /* Cards */
 .card-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 18px;
-    margin-bottom: 32px;
+    gap: 20px;
+    margin-bottom: 36px;
 }
 
 .card {
     background:
-        linear-gradient(180deg, rgba(255,255,255,0.025) 0%, transparent 50%),
+        linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 50%),
         var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 22px 22px 20px;
+    padding: 24px 24px 22px;
     position: relative;
-    overflow: hidden;
+    /* NOTE: no overflow:hidden here — that would clip gradient-text descenders.
+       The ::before hairline uses inherited border-radius via clip-path. */
     transition:
         border-color var(--duration) var(--ease),
         transform var(--duration-slow) var(--ease-out),
@@ -301,28 +339,54 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
     content: '';
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
+    left: 12px;
+    right: 12px;
     height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(94,106,210,0.6), rgba(236,72,153,0.4), transparent);
-    opacity: 0.6;
+    background: linear-gradient(90deg, transparent, rgba(94,106,210,0.7), rgba(236,72,153,0.5), transparent);
+    opacity: 0.7;
+    transition: opacity var(--duration-slow) var(--ease-out);
+}
+/* Side accent rail — vertical glow on the left edge, fades in on hover */
+.card::after {
+    content: '';
+    position: absolute;
+    top: 16px;
+    bottom: 16px;
+    left: 0;
+    width: 3px;
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+    background: var(--gradient-accent);
+    opacity: 0;
     transition: opacity var(--duration-slow) var(--ease-out);
 }
 
 @media (hover: hover) {
     .card:hover {
         border-color: var(--border-strong);
-        transform: translateY(-2px);
+        transform: translateY(-3px);
         box-shadow: var(--shadow-md), var(--shadow-glow);
     }
     .card:hover::before { opacity: 1; }
+    .card:hover::after  { opacity: 1; }
 }
+
+/* Featured/hero card variant — bigger, with persistent rail */
+.card.featured {
+    padding: 28px 28px 26px;
+    background:
+        radial-gradient(800px 200px at 0% 0%, rgba(94,106,210,0.10), transparent 60%),
+        linear-gradient(180deg, rgba(255,255,255,0.04), transparent 50%),
+        var(--bg-card);
+}
+.card.featured::after { opacity: 1; width: 4px; }
+.card.featured .card-value { font-size: clamp(36px, 5vw, 56px); }
 
 .card-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
+    gap: 12px;
 }
 
 .card-title {
@@ -330,15 +394,21 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
     font-weight: 600;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
+    /* Prevent multi-word titles from being clipped */
+    overflow-wrap: anywhere;
+    line-height: 1.4;
 }
 
 .card-value {
     font-family: var(--font-display);
-    font-size: 36px;
+    font-size: clamp(32px, 3.4vw, 44px);
     font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.05;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    /* Reserve room for descenders + tracking so gradient-text never clips */
+    padding-bottom: 0.08em;
+    word-break: break-word;
 }
 
 .card-value.positive {
@@ -346,14 +416,25 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
     background: var(--gradient-success);
     -webkit-background-clip: text;
     background-clip: text;
+    display: inline-block;
+    padding: 0 0.04em 0.12em;
 }
 .card-value.negative {
     color: transparent;
     background: var(--gradient-danger);
     -webkit-background-clip: text;
     background-clip: text;
+    display: inline-block;
+    padding: 0 0.04em 0.12em;
 }
 .card-value.neutral { color: var(--text-primary); }
+
+.card-subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-top: 6px;
+    overflow-wrap: anywhere;
+}
 
 .card-subtitle {
     font-size: 13px;
@@ -634,14 +715,18 @@ tr:last-child td { border-bottom: none; }
 
 .login-box h1 {
     font-family: var(--font-display);
-    font-size: 26px;
-    font-weight: 700;
+    font-size: 28px;
+    font-weight: 800;
     margin-bottom: 8px;
-    letter-spacing: -0.025em;
+    letter-spacing: -0.03em;
+    line-height: 1.2;
     background: linear-gradient(180deg, #FFFFFF 0%, #B4B7BD 100%);
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    color: transparent;
+    display: inline-block;
+    padding: 0 0.05em 0.12em;
 }
 
 .login-box p {
@@ -1040,10 +1125,12 @@ tr:last-child td { border-bottom: none; }
 .pipeline-step-dot.c-red { background: var(--accent-red); }
 
 .pipeline-step-title {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 600;
     color: var(--text-primary);
-    white-space: nowrap;
+    line-height: 1.3;
+    /* Allow long titles like "Macro Catalysts" to wrap rather than be cut */
+    overflow-wrap: anywhere;
 }
 
 .pipeline-step-value {
@@ -1073,7 +1160,9 @@ tr:last-child td { border-bottom: none; }
     border-radius: 3px;
     background: rgba(88, 166, 255, 0.1);
     color: var(--accent-blue);
-    white-space: nowrap;
+    /* Allow tags to wrap when wider than container instead of clipping */
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .pipe-tag.t-green { background: rgba(63,185,80,0.1); color: var(--accent-green); }
@@ -1170,15 +1259,18 @@ tr:last-child td { border-bottom: none; }
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 6px;
+    padding: 5px 7px;
     border-radius: 6px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    font-size: 9px;
+    font-size: 10px;
+    line-height: 1.3;
     cursor: default;
     transition: all 0.2s;
-    white-space: nowrap;
-    overflow: hidden;
+    /* Allow long node names to wrap onto a second line instead of being clipped */
+    white-space: normal;
+    word-break: break-word;
+    min-height: 26px;
     opacity: 0;
     animation: stepIn 0.3s ease-out forwards;
 }
@@ -1212,9 +1304,11 @@ tr:last-child td { border-bottom: none; }
 
 .dag-node-label {
     flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    /* Wrap instead of ellipsis so users can read full node names */
+    overflow-wrap: anywhere;
+    word-break: break-word;
     color: var(--text-primary);
+    line-height: 1.25;
 }
 
 .dag-node-metric {
@@ -1303,3 +1397,230 @@ tr:last-child td { border-bottom: none; }
 .chart-container { position: relative; height: 300px; }
 .chart-container canvas { max-height: 300px; }
 .empty-state { color: var(--text-secondary); text-align: center; padding: 40px 20px; font-size: 14px; }
+
+/* ─────────────────────────────────────────────────────────────────────
+   Dramatic components — hero, score-ring, sparkline, glass surfaces.
+   These are additive: pages can opt in by emitting the new HTML.
+   ───────────────────────────────────────────────────────────────────── */
+
+/* Hero block: massive headline with eyebrow + accent rule.
+   Use at the top of a page instead of a plain .page-title. */
+.hero {
+    position: relative;
+    padding: 8px 0 28px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid var(--border);
+}
+.hero::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 96px;
+    height: 2px;
+    background: var(--gradient-accent);
+    border-radius: 2px;
+    box-shadow: 0 0 12px rgba(94,106,210,0.5);
+}
+.hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(34px, 5.5vw, 64px);
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    background: linear-gradient(180deg, #FFFFFF 0%, #9CA0A8 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    display: inline-block;
+    padding: 0 0.05em 0.12em;
+    margin: 12px 0 8px;
+    overflow-wrap: anywhere;
+}
+.hero .hero-sub {
+    font-size: clamp(14px, 1.5vw, 17px);
+    color: var(--text-secondary);
+    line-height: 1.5;
+    max-width: 70ch;
+    overflow-wrap: anywhere;
+}
+.hero .hero-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px 36px;
+    margin-top: 24px;
+}
+.hero .hero-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.hero .hero-stat-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-secondary);
+}
+.hero .hero-stat-value {
+    font-family: var(--font-display);
+    font-size: clamp(22px, 2.4vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
+    padding-bottom: 0.05em;
+}
+
+/* Score ring — circular conviction indicator using conic-gradient.
+   Pages can render: <div class="score-ring" style="--score:78"><span>78</span></div> */
+.score-ring {
+    --score: 50;
+    --size: 64px;
+    width: var(--size);
+    height: var(--size);
+    border-radius: 50%;
+    background:
+        conic-gradient(
+            from -90deg,
+            var(--accent) 0%,
+            #8B5CF6 calc(var(--score) * 0.5%),
+            #EC4899 calc(var(--score) * 1%),
+            var(--bg-elevated) calc(var(--score) * 1%)
+        );
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    flex-shrink: 0;
+    box-shadow: 0 0 18px rgba(139,92,246,0.35);
+}
+.score-ring::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    background: var(--bg-card);
+    border-radius: 50%;
+}
+.score-ring > span {
+    position: relative;
+    font-family: var(--font-display);
+    font-size: calc(var(--size) * 0.32);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    line-height: 1;
+}
+.score-ring.danger { box-shadow: 0 0 18px rgba(235,87,87,0.35); }
+.score-ring.danger {
+    background:
+        conic-gradient(
+            from -90deg,
+            #F43F5E 0%, #EB5757 calc(var(--score) * 1%),
+            var(--bg-elevated) calc(var(--score) * 1%)
+        );
+}
+.score-ring.success {
+    background:
+        conic-gradient(
+            from -90deg,
+            #10B981 0%, #26C281 calc(var(--score) * 1%),
+            var(--bg-elevated) calc(var(--score) * 1%)
+        );
+    box-shadow: 0 0 18px rgba(16,185,129,0.3);
+}
+
+/* Sparkline placeholder — a horizontal accent bar that suggests trend.
+   Pages can include real <svg> sparklines and they'll inherit the styling. */
+.sparkline {
+    display: inline-block;
+    width: 100%;
+    max-width: 140px;
+    height: 28px;
+    background:
+        linear-gradient(90deg,
+            transparent 0%,
+            rgba(94,106,210,0.15) 30%,
+            rgba(236,72,153,0.2) 100%);
+    border-radius: var(--radius-sm);
+    position: relative;
+}
+.sparkline svg { width: 100%; height: 100%; display: block; }
+.sparkline svg path { stroke: url(#sparkline-grad); stroke-width: 1.5; fill: none; }
+
+/* Glass surface — for premium panels (e.g., scoreboard, leaderboard) */
+.glass {
+    background:
+        radial-gradient(800px 200px at 50% 0%, rgba(94,106,210,0.10), transparent 60%),
+        rgba(15, 16, 17, 0.6);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+}
+.glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, transparent 40%);
+    pointer-events: none;
+}
+
+/* Section divider with gradient */
+.divider {
+    height: 1px;
+    border: none;
+    background: linear-gradient(90deg, transparent, var(--border-strong) 20%, var(--border-strong) 80%, transparent);
+    margin: 32px 0;
+}
+
+/* Inline kbd / monospace emphasis */
+kbd, .kbd {
+    font-family: var(--font-mono);
+    font-size: 0.85em;
+    padding: 2px 6px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+}
+
+/* Animate cards in on first paint — staggered fade+slide.
+   Pages can stagger by setting --delay on each card. */
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+.card-grid > .card {
+    animation: cardIn 0.45s var(--ease-out) both;
+    animation-delay: var(--delay, 0ms);
+}
+.card-grid > .card:nth-child(1) { --delay: 0ms; }
+.card-grid > .card:nth-child(2) { --delay: 60ms; }
+.card-grid > .card:nth-child(3) { --delay: 120ms; }
+.card-grid > .card:nth-child(4) { --delay: 180ms; }
+.card-grid > .card:nth-child(5) { --delay: 240ms; }
+.card-grid > .card:nth-child(6) { --delay: 300ms; }
+
+/* Tier-coded side rails for picks (Strong Buy = green, etc.) — opt-in via data-tier */
+.card[data-tier="strong-buy"]::after,
+.card[data-tier="A"]::after { background: var(--gradient-success); opacity: 1; width: 4px; }
+.card[data-tier="watch"]::after,
+.card[data-tier="B"]::after { background: var(--gradient-warn); opacity: 1; width: 4px; }
+.card[data-tier="risk"]::after,
+.card[data-tier="C"]::after { background: var(--gradient-danger); opacity: 1; width: 4px; }
+
+/* Sparkline gradient defs — referenced by inline SVGs */
+@media (prefers-reduced-motion: no-preference) {
+    .card-value.shimmer {
+        background-size: 200% 100%;
+        animation: shimmer 4s linear infinite;
+    }
+}
+@keyframes shimmer {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
