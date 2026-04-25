@@ -147,7 +147,7 @@ const Router = {
                 }
             }
             // Block direct hash navigation to admin pages too.
-            const ADMIN_ROUTES = new Set(['/budget', '/system']);
+            const ADMIN_ROUTES = new Set(['/budget', '/system', '/pipeline']);
             const SUPER_ADMIN_ROUTES = new Set(['/admin']);
             if (!isAdmin && ADMIN_ROUTES.has(path)) {
                 window.location.hash = '#/daily';

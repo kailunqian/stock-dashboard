@@ -20,7 +20,7 @@
     <!-- Inter font (Linear-style typography) — non-blocking, system fallback acceptable -->
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
-    <link rel="stylesheet" href="css/style.css?v=4.8">
+    <link rel="stylesheet" href="css/style.css?v=4.9">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
 </head>
 <body>
@@ -33,7 +33,7 @@
         <div class="nav-links">
             <a href="#/daily">Daily</a>
             <a href="#/performance">Performance</a>
-            <a href="#/pipeline">Pipeline</a>
+            <a href="#/pipeline" data-admin-only>Pipeline</a>
             <a href="#/budget" data-admin-only>Budget</a>
             <a href="#/system" data-admin-only>System</a>
             <a href="#/admin" data-super-admin-only>Admin</a>
@@ -85,13 +85,13 @@
     <nav class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
         <a href="#/daily"       data-route="/daily"       aria-label="Daily picks"><span class="icon" aria-hidden="true">📊</span><span>Daily</span></a>
         <a href="#/performance" data-route="/performance" aria-label="Performance"><span class="icon" aria-hidden="true">📈</span><span>Perf</span></a>
-        <a href="#/pipeline"    data-route="/pipeline"    aria-label="Pipeline"><span class="icon" aria-hidden="true">🔀</span><span>Pipeline</span></a>
+        <a href="#/pipeline"    data-route="/pipeline"    data-admin-only aria-label="Pipeline"><span class="icon" aria-hidden="true">🔀</span><span>Pipeline</span></a>
         <a href="#/budget"      data-route="/budget"      data-admin-only aria-label="Budget"><span class="icon" aria-hidden="true">💰</span><span>Budget</span></a>
         <a href="#/system"      data-route="/system"      data-admin-only aria-label="System status"><span class="icon" aria-hidden="true">⚙️</span><span>System</span></a>
     </nav>
 
-    <script src="js/api.js?v=4.8"></script>
-    <script src="js/app.js?v=4.8"></script>
+    <script src="js/api.js?v=4.9"></script>
+    <script src="js/app.js?v=4.9"></script>
     <script>
         // PWA service worker — best-effort, fails silently on http://localhost
         if ('serviceWorker' in navigator) {
