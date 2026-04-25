@@ -81,6 +81,30 @@ const Router = {
             document.querySelectorAll('[data-super-admin-only]').forEach(el => {
                 el.style.display = isSuperAdmin ? '' : 'none';
             });
+            // Phase 13d.3: wire up "View as" tier impersonation selector
+            // (admin-only; backend enforces, this is just UX).
+            const viewAsSel = document.getElementById('view-as-select');
+            if (viewAsSel && isAdmin && !viewAsSel._wired) {
+                viewAsSel._wired = true;
+                try {
+                    viewAsSel.value = localStorage.getItem('viewAsTier') || 'real';
+                } catch (_) {}
+                viewAsSel.addEventListener('change', () => {
+                    try {
+                        if (viewAsSel.value === 'real') {
+                            localStorage.removeItem('viewAsTier');
+                        } else {
+                            localStorage.setItem('viewAsTier', viewAsSel.value);
+                        }
+                    } catch (_) {}
+                    // Hard reload to flush any cached tier-gated UI.
+                    window.location.reload();
+                });
+                // Visible "impersonating" badge on body for safety.
+                const v = viewAsSel.value;
+                document.body.classList.toggle('is-impersonating', v && v !== 'real');
+                document.body.dataset.viewAs = v || 'real';
+            }
             // Block direct hash navigation to admin pages too.
             const ADMIN_ROUTES = new Set(['/budget', '/system']);
             const SUPER_ADMIN_ROUTES = new Set(['/admin']);

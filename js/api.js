@@ -26,6 +26,12 @@ const API = {
     headers() {
         const h = { 'Content-Type': 'application/json' };
         if (this.token) h['Authorization'] = `Bearer ${this.token}`;
+        // Phase 13d.3: admin-only "view as" impersonation. Backend ignores
+        // this header for non-admins, so it's safe to always send.
+        try {
+            const v = localStorage.getItem('viewAsTier');
+            if (v && v !== 'real') h['X-View-As-Tier'] = v;
+        } catch (_) {}
         return h;
     },
 
