@@ -71,11 +71,25 @@ const Router = {
             document.body.classList.add('has-bottom-nav');
             // Phase 13d.1: hide admin-only nav links from non-admins.
             // Phase 13d.2: separate super-admin gate for /admin (co-admin mgmt).
-            const isAdmin = !!auth.is_admin;
-            const isSuperAdmin = !!auth.is_super_admin;
+            const realIsAdmin = !!auth.is_admin;
+            const realIsSuperAdmin = !!auth.is_super_admin;
+            // Phase 13d.3: when impersonating a non-admin tier, hide admin
+            // chrome too so the UX matches what a real Free/Pro user sees.
+            // The View-as selector + escape banner remain visible (they're
+            // injected/preserved separately below).
+            let viewAsTier = 'real';
+            try { viewAsTier = localStorage.getItem('viewAsTier') || 'real'; } catch (_) {}
+            const impersonatingNonAdmin = realIsAdmin && viewAsTier !== 'real' && viewAsTier !== 'grandfathered';
+            const isAdmin = realIsAdmin && !impersonatingNonAdmin;
+            const isSuperAdmin = realIsSuperAdmin && !impersonatingNonAdmin;
             document.body.classList.toggle('is-admin', isAdmin);
             document.body.classList.toggle('is-super-admin', isSuperAdmin);
             document.querySelectorAll('[data-admin-only]').forEach(el => {
+                // Skip the View-as selector — admin must always be able to exit.
+                if (el.id === 'view-as-select' || el.closest('#view-as-select')) {
+                    el.style.display = realIsAdmin ? '' : 'none';
+                    return;
+                }
                 el.style.display = isAdmin ? '' : 'none';
             });
             document.querySelectorAll('[data-super-admin-only]').forEach(el => {
@@ -84,7 +98,7 @@ const Router = {
             // Phase 13d.3: wire up "View as" tier impersonation selector
             // (admin-only; backend enforces, this is just UX).
             const viewAsSel = document.getElementById('view-as-select');
-            if (viewAsSel && isAdmin && !viewAsSel._wired) {
+            if (viewAsSel && realIsAdmin && !viewAsSel._wired) {
                 viewAsSel._wired = true;
                 try {
                     viewAsSel.value = localStorage.getItem('viewAsTier') || 'real';
