@@ -318,8 +318,8 @@ Router.register('/daily', async () => {
         </div>
         <div class="card">
             <div class="card-header"><div class="card-title">ML Model</div></div>
-            <div class="card-value neutral" style="font-size:clamp(20px, 2.4vw, 28px)">${model.version || training.model_version || '—'}</div>
-            <div class="card-subtitle">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
+            <div class="card-value code">${model.version || training.model_version || '—'}</div>
+            <div class="card-subtitle" style="margin-top:8px">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
         </div>
         ${trainingHtml}
     </div>

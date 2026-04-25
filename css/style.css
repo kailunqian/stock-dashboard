@@ -270,11 +270,11 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
    to prevent gradient-text descender clipping (g/y/p/q letters). */
 .page-title {
     font-family: var(--font-display);
-    font-size: clamp(28px, 4.2vw, 48px);
-    font-weight: 800;
-    letter-spacing: -0.035em;
-    line-height: 1.15;
-    margin-bottom: 32px;
+    font-size: clamp(22px, 2.6vw, 32px);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.2;
+    margin-bottom: 24px;
     display: flex;
     flex-wrap: wrap;
     align-items: baseline;
@@ -372,14 +372,14 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
 
 /* Featured/hero card variant — bigger, with persistent rail */
 .card.featured {
-    padding: 28px 28px 26px;
+    padding: 24px 24px 22px;
     background:
         radial-gradient(800px 200px at 0% 0%, rgba(94,106,210,0.10), transparent 60%),
         linear-gradient(180deg, rgba(255,255,255,0.04), transparent 50%),
         var(--bg-card);
 }
 .card.featured::after { opacity: 1; width: 4px; }
-.card.featured .card-value { font-size: clamp(36px, 5vw, 56px); }
+.card.featured .card-value { font-size: clamp(28px, 3.2vw, 38px); }
 
 .card-header {
     display: flex;
@@ -402,13 +402,31 @@ table, .card-value, .pill, .conviction-bar, .weight-bar-label,
 
 .card-value {
     font-family: var(--font-display);
-    font-size: clamp(32px, 3.4vw, 44px);
+    font-size: clamp(24px, 2.4vw, 30px);
     font-weight: 700;
-    letter-spacing: -0.035em;
-    line-height: 1.1;
+    letter-spacing: -0.025em;
+    line-height: 1.15;
     /* Reserve room for descenders + tracking so gradient-text never clips */
     padding-bottom: 0.08em;
     word-break: break-word;
+}
+
+/* For long identifier-like values (model versions, hashes, IDs) — use
+   monospace at a comfortable read size so they don't overflow or wrap mid-word. */
+.card-value.code {
+    font-family: var(--font-mono);
+    font-size: clamp(13px, 1.2vw, 15px);
+    font-weight: 500;
+    letter-spacing: 0;
+    color: var(--text-primary);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    line-height: 1.4;
 }
 
 .card-value.positive {
@@ -1424,10 +1442,10 @@ tr:last-child td { border-bottom: none; }
 }
 .hero h1 {
     font-family: var(--font-display);
-    font-size: clamp(34px, 5.5vw, 64px);
-    font-weight: 800;
-    letter-spacing: -0.04em;
-    line-height: 1.05;
+    font-size: clamp(26px, 3.4vw, 40px);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
     background: linear-gradient(180deg, #FFFFFF 0%, #9CA0A8 100%);
     -webkit-background-clip: text;
     background-clip: text;
@@ -1439,11 +1457,12 @@ tr:last-child td { border-bottom: none; }
     overflow-wrap: anywhere;
 }
 .hero .hero-sub {
-    font-size: clamp(14px, 1.5vw, 17px);
+    font-size: 14px;
     color: var(--text-secondary);
     line-height: 1.5;
     max-width: 70ch;
     overflow-wrap: anywhere;
+    margin-bottom: 4px;
 }
 .hero .hero-stats {
     display: flex;
@@ -1465,10 +1484,10 @@ tr:last-child td { border-bottom: none; }
 }
 .hero .hero-stat-value {
     font-family: var(--font-display);
-    font-size: clamp(22px, 2.4vw, 32px);
+    font-size: clamp(18px, 1.8vw, 24px);
     font-weight: 700;
-    letter-spacing: -0.025em;
-    line-height: 1.15;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
     padding-bottom: 0.05em;
 }
 
