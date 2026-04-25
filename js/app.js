@@ -354,12 +354,12 @@ Router.register('/login', async () => {
         <tr class="locked-row"><td><strong>${p.sym}</strong></td><td>${recPill(p.rec)}</td>
             <td>${p.score}</td><td>$—</td><td>—</td></tr>`).join('');
     const perfCards = [
-        { title: '30D Performance', value: '62%', sub: '🟢 18W / 11L' },
-        { title: '90D Performance', value: '58%', sub: '🟢 47W / 34L' },
-        { title: 'Avg Return',      value: '+3.4%', sub: 'per pick, 30D' },
-        { title: 'Alpha vs SPY',    value: '+1.8%', sub: 'risk-adjusted' },
+        { title: '30D Hit Rate',   value: '62%',   sub: '🟢 18W / 11L (29 picks)' },
+        { title: '90D Hit Rate',   value: '58%',   sub: '🟢 47W / 34L (81 picks)' },
+        { title: 'Avg Return',     value: '+3.4%', sub: 'per pick, 30D rolling' },
+        { title: 'Alpha vs SPY',   value: '+1.8%', sub: 'risk-adjusted' },
     ].map(c => `
-        <div class="card teaser-blur-card">
+        <div class="card">
             <div class="card-title">${c.title}</div>
             <div class="card-value positive">${c.value}</div>
             <div class="card-subtitle">${c.sub}</div>
@@ -947,42 +947,41 @@ Router.register('/pipeline', async () => {
 Router.register('/performance', async () => {
     const data = await API.performance();
     if (!data) return '<p>Failed to load</p>';
-    // Phase 13d.3: Performance is Pro-only — render realistic blurred cards
-    // with a single CTA card so it feels like a real dashboard with details
-    // hidden, not an abrupt full-page overlay.
+    // Phase 13d.3: Performance preview for Free — show historical stats VISIBLY
+    // (those are proof, not actionable). Only the live/per-pick drilldowns are
+    // gated, expressed via a single CTA card. No per-card blur.
     if (effectiveViewAsTier() === 'free') {
-        const fakeCards = [
-            { title: '30D Performance', value: '62%', sub: '🟢 18W / 11L (29 picks)', cls: 'positive' },
-            { title: '90D Performance', value: '58%', sub: '🟢 47W / 34L (81 picks)', cls: 'positive' },
-            { title: 'All-Time', value: '54%', sub: '🟢 142W / 121L (263 picks)', cls: 'positive' },
-            { title: 'Avg Return', value: '+3.4%', sub: 'per pick, 30D rolling', cls: 'positive' },
-            { title: 'Alpha vs SPY', value: '+1.8%', sub: 'risk-adjusted', cls: 'positive' },
-            { title: 'Sharpe Ratio', value: '1.42', sub: 'last 90 days', cls: 'positive' },
+        const cards = [
+            { title: '30D Hit Rate',  value: '62%',   sub: '🟢 18W / 11L (29 picks)' },
+            { title: '90D Hit Rate',  value: '58%',   sub: '🟢 47W / 34L (81 picks)' },
+            { title: 'All-Time',      value: '54%',   sub: '🟢 142W / 121L (263 picks)' },
+            { title: 'Avg Return',    value: '+3.4%', sub: 'per pick, 30D rolling' },
+            { title: 'Alpha vs SPY',  value: '+1.8%', sub: 'risk-adjusted' },
+            { title: 'Sharpe Ratio',  value: '1.42',  sub: 'last 90 days' },
         ];
-        const cardsHtml = fakeCards.map(c => `
-            <div class="card teaser-blur-card">
+        const cardsHtml = cards.map(c => `
+            <div class="card">
                 <div class="card-title">${c.title}</div>
-                <div class="card-value ${c.cls}">${c.value}</div>
+                <div class="card-value positive">${c.value}</div>
                 <div class="card-subtitle">${c.sub}</div>
             </div>`).join('');
         return `
         <h1 style="margin-bottom:18px">Performance</h1>
+        <p style="color:var(--text-secondary);margin:0 0 18px">Historical hit-rate and risk-adjusted returns based on backtested signals.</p>
         <div class="dashboard-grid">
             ${cardsHtml}
             <div class="card teaser-cta-card">
                 <div style="font-size:36px;margin-bottom:8px">🔒</div>
-                <div class="card-title" style="color:var(--text-primary)">Unlock Performance</div>
+                <div class="card-title" style="color:var(--text-primary)">Live picks &amp; drilldowns</div>
                 <div style="color:var(--text-secondary);font-size:14px;margin:6px 0 14px;line-height:1.5">
-                    See real hit-rate, alpha vs SPY, calibration curves, and per-strategy breakdowns.
+                    See today's picks, calibration curves, per-strategy breakdowns and per-stock drilldowns.
                 </div>
                 <a href="#/billing" class="btn-unlock">Upgrade to Pro →</a>
             </div>
         </div>
-        <div class="card teaser-blur-card" style="margin-top:18px;min-height:220px">
-            <div class="card-title">Calibration Curve</div>
-            <div style="color:var(--text-secondary);font-size:13px">Predicted vs realized hit-rate by score bucket</div>
-            <div style="height:160px;background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(245,158,11,0.10));border-radius:8px;margin-top:12px"></div>
-        </div>`;
+        <p style="color:var(--text-secondary);font-size:12px;margin-top:14px">
+            *Based on tracked signals. Past performance does not guarantee future results. Not financial advice.
+        </p>`;
     }
 
     const sc = data.scorecard?.scorecards || {};
