@@ -508,9 +508,11 @@ Router.register('/daily', async () => {
     const training = data.training || {};
     const model = data.model || {};
     const isLimited = !!data.tier_gated;
+    const _shownCount = (data.predictions && data.predictions.length)
+                     || (scan.top_picks && scan.top_picks.length) || 0;
     const limitedBanner = isLimited ? `
         <div class="glass" style="padding:14px 18px;margin-bottom:18px;border-color:rgba(255,180,80,0.3)">
-            <strong>Free tier:</strong> showing top ${data.predictions.length} pick (delayed 24h).
+            <strong>Free tier:</strong> showing top ${_shownCount} pick (delayed 24h).
             <a href="#/billing" style="margin-left:8px">Upgrade to Pro →</a>
         </div>` : '';
 
