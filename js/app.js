@@ -458,8 +458,24 @@ Router.register('/daily', async () => {
     const data = await API.daily();
     if (!data) return '<p>Failed to load</p>';
 
+    // Phase 13d.3: client-side Free-tier preview when admin is impersonating.
+    // Backend short-circuits to grandfathered while SAAS_ENABLED=false, so we
+    // synthesize the gated experience here. When SAAS goes live the backend
+    // sends tier_gated=true already and this code becomes a no-op.
+    let effectiveTier = 'real';
+    try { effectiveTier = localStorage.getItem('viewAsTier') || 'real'; } catch (_) {}
+    if (effectiveTier === 'free' && data.scan && Array.isArray(data.scan.top_picks)) {
+        const picks = data.scan.top_picks;
+        if (picks.length > 1) {
+            data.scan._locked_picks = picks.slice(1);
+            data.scan.top_picks = picks.slice(0, 1);
+            data.tier_gated = true;
+        }
+    }
+
     // Phase 13d paywall: free tier with no picks → upgrade banner instead of empty page
-    if (data.tier_gated && (!data.predictions || data.predictions.length === 0)) {
+    if (data.tier_gated && (!data.predictions || data.predictions.length === 0)
+        && (!data.scan || !data.scan.top_picks || data.scan.top_picks.length === 0)) {
         const hrs = data.hours_until_unlock;
         const reason = hrs != null
             ? `Today's picks unlock for free users in <strong>${hrs} hours</strong>.`
@@ -513,6 +529,37 @@ Router.register('/daily', async () => {
                 <td>${keySignal}</td>
             </tr>`;
         }).join('');
+
+        // Phase 13d.3: blurred teaser rows + Unlock CTA when tier-gated
+        const lockedPicks = scan._locked_picks || [];
+        if (lockedPicks.length > 0) {
+            const lockedRows = lockedPicks.map(p => {
+                const sc = Math.max(0, Math.min(100, Math.round(p.score || 0)));
+                return `
+                <tr class="locked-row">
+                    <td><strong>${p.symbol}</strong></td>
+                    <td>${p.recommendation ? recPill(p.recommendation) : '—'}</td>
+                    <td>${sc}</td>
+                    <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : '—'}</td>
+                    <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
+                    <td>${p.stop_loss ? '$' + p.stop_loss.toFixed(2) : '—'}</td>
+                    <td class="hide-mobile">—</td>
+                    <td>${(p.signals || [])[0] || '—'}</td>
+                </tr>`;
+            }).join('');
+            picksHtml += lockedRows + `
+                <tr class="unlock-cta-row"><td colspan="8">
+                    <div class="unlock-cta">
+                        <div>
+                            <strong>🔒 ${lockedPicks.length} more pick${lockedPicks.length > 1 ? 's' : ''} hidden</strong>
+                            <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">
+                                Unlock all daily picks, per-stock drilldowns, and real-time alerts with Pro.
+                            </div>
+                        </div>
+                        <a href="#/billing" class="btn-primary">Unlock with Pro →</a>
+                    </div>
+                </td></tr>`;
+        }
     } else if (scan.stocks_scanned) {
         picksHtml = `<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">
             No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
