@@ -1837,7 +1837,29 @@ select.login-input option:hover{
 }
 
 
-/* Phase 13d.3: View-as tier impersonation (admin-only) */
+
+
+
+
+
+/* Global safety net: any <select> inside the app should render its
+   options with our dark surface, not OS chrome. Targeted regression
+   tests enforce that every <select class> in index.html has matching
+   option styling. */
+select option,
+select optgroup{
+    background-color:#1a1d29;
+    color:#e7e9f0;
+}
+select option:checked{
+    background-color:#4f46e5;
+    color:#fff;
+}
+
+
+/* Phase 13d.3 v2: View-as tier impersonation (admin-only). The visible
+   banner is a real DOM element (#impersonation-bar) — no pseudo-element
+   tricks that can break with weird encodings. */
 .view-as-select{
     background:rgba(99,102,241,0.12);
     color:var(--text-primary);
@@ -1853,34 +1875,28 @@ select.login-input option:hover{
     background-position:right 10px center;
     padding-right:28px;
 }
-.view-as-select option{background:var(--surface);color:var(--text-primary);}
+.view-as-select option{background:#1a1d29;color:#e7e9f0;}
 .view-as-select:hover{border-color:var(--accent);}
 
-body.is-impersonating::before{
-    content:"⚠ Impersonating: " attr(data-view-as) " — admin tools hidden";
-    position:fixed;top:0;left:0;right:0;
+#impersonation-bar{
+    position:fixed;top:0;left:0;right:0;height:32px;
     background:linear-gradient(90deg,#f59e0b,#ef4444);
-    color:#fff;font-weight:600;font-size:12px;
-    text-align:center;padding:6px 12px;z-index:9999;
-    text-transform:capitalize;letter-spacing:0.3px;
+    color:#fff;font-weight:600;font-size:13px;
+    display:flex;align-items:center;justify-content:center;gap:14px;
+    padding:0 16px;z-index:9999;
     box-shadow:0 2px 8px rgba(0,0,0,0.3);
+    box-sizing:border-box;
 }
-body.is-impersonating{padding-top:28px;}
+#impersonation-bar strong{text-transform:capitalize;letter-spacing:0.3px;}
+#impersonation-bar button{
+    background:rgba(0,0,0,0.25);color:#fff;border:1px solid rgba(255,255,255,0.4);
+    border-radius:6px;padding:3px 12px;font-size:12px;font-weight:600;
+    cursor:pointer;transition:background 120ms;
+}
+#impersonation-bar button:hover{background:rgba(0,0,0,0.45);}
+body.is-impersonating{padding-top:32px;}
 @media (max-width:768px){
     .view-as-select{margin:0 0 8px 0;width:100%;}
-}
-
-
-/* Global safety net: any <select> inside the app should render its
-   options with our dark surface, not OS chrome. Targeted regression
-   tests enforce that every <select class> in index.html has matching
-   option styling. */
-select option,
-select optgroup{
-    background-color:#1a1d29;
-    color:#e7e9f0;
-}
-select option:checked{
-    background-color:#4f46e5;
-    color:#fff;
+    #impersonation-bar{font-size:12px;height:auto;padding:6px 12px;flex-wrap:wrap;}
+    body.is-impersonating{padding-top:48px;}
 }

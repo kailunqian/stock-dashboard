@@ -107,8 +107,30 @@ const Router = {
                 });
                 // Visible "impersonating" badge on body for safety.
                 const v = viewAsSel.value;
-                document.body.classList.toggle('is-impersonating', v && v !== 'real');
+                const impersonating = !!(v && v !== 'real');
+                document.body.classList.toggle('is-impersonating', impersonating);
                 document.body.dataset.viewAs = v || 'real';
+                // Inject a clickable "exit impersonation" banner so admin can
+                // always escape, even if the page underneath fails to render.
+                let exitBar = document.getElementById('impersonation-bar');
+                if (impersonating && !exitBar) {
+                    exitBar = document.createElement('div');
+                    exitBar.id = 'impersonation-bar';
+                    exitBar.innerHTML = `<span>⚠ Viewing as <strong>${v}</strong></span>
+                        <button id="exit-impersonation-btn">← Back to Admin view</button>`;
+                    document.body.insertBefore(exitBar, document.body.firstChild);
+                    document.getElementById('exit-impersonation-btn').addEventListener('click', () => {
+                        try {
+                            localStorage.removeItem('viewAsTier');
+                            Object.keys(localStorage)
+                                .filter(k => k.startsWith('swr:'))
+                                .forEach(k => localStorage.removeItem(k));
+                        } catch (_) {}
+                        window.location.reload();
+                    });
+                } else if (!impersonating && exitBar) {
+                    exitBar.remove();
+                }
             }
             // Block direct hash navigation to admin pages too.
             const ADMIN_ROUTES = new Set(['/budget', '/system']);
