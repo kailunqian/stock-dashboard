@@ -41,9 +41,17 @@ const Router = {
             // Bottom-nav: visible on mobile only — controlled entirely by
             // CSS via `body.has-bottom-nav` + @media (max-width: 768px).
             document.body.classList.add('has-bottom-nav');
+            // Phase 13e: legal disclaimer on every authenticated page,
+            // dismissible per browser session (resets on tab close).
+            const bar = document.getElementById('disclaimer-bar');
+            if (bar && !sessionStorage.getItem('disclaimer-dismissed')) {
+                bar.hidden = false;
+            }
         } else {
             document.getElementById('nav').style.display = 'none';
             document.body.classList.remove('has-bottom-nav');
+            const bar = document.getElementById('disclaimer-bar');
+            if (bar) bar.hidden = true;
         }
 
         // Highlight active nav (top + bottom)
@@ -153,6 +161,15 @@ function timeSince(iso) {
 
 Router.register('/login', async () => {
     setTimeout(() => {
+        const dismiss = document.getElementById('disclaimer-dismiss');
+        if (dismiss && !dismiss.dataset.bound) {
+            dismiss.dataset.bound = '1';
+            dismiss.addEventListener('click', () => {
+                sessionStorage.setItem('disclaimer-dismissed', '1');
+                const bar = document.getElementById('disclaimer-bar');
+                if (bar) bar.hidden = true;
+            });
+        }
         const form = document.getElementById('login-form');
         if (form) form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -175,19 +192,48 @@ Router.register('/login', async () => {
     }, 50);
 
     return `
+    <section class="landing-hero" aria-label="What StockAnalysis does">
+        <div class="badge">Daily AI Stock Picks</div>
+        <h1>Signals you can act on, not noise.</h1>
+        <p>An ML pipeline scores 240+ stocks every market day across technicals,
+           fundamentals, news sentiment, and momentum — surfacing the few that
+           actually move. Built for self-directed investors.</p>
+        <div class="landing-features">
+            <div class="landing-feature">
+                <div class="feature-title">Daily Top Picks</div>
+                <div class="feature-sub">Tier-ranked actionable signals every trading day.</div>
+            </div>
+            <div class="landing-feature">
+                <div class="feature-title">Backed by Backtests</div>
+                <div class="feature-sub">Live hit-rate, calibration, and per-tier diagnostics — fully transparent.</div>
+            </div>
+            <div class="landing-feature">
+                <div class="feature-title">No Brokerage Linking</div>
+                <div class="feature-sub">We never touch your account or holdings.</div>
+            </div>
+        </div>
+        <div class="landing-pricing">
+            <strong>Pro $9/mo</strong> · Free tier available · US &amp; Canada only ·
+            Not financial advice
+        </div>
+    </section>
     <div class="login-container">
         <div class="login-box">
             <div class="login-logo">
                 <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             </div>
-            <h1>StockAnalysis</h1>
-            <p>Sign in with a magic link sent to your email</p>
+            <h1>Sign in</h1>
+            <p>Magic link sent to your email. No password to remember.</p>
             <form id="login-form">
                 <input type="email" id="login-email" class="login-input" placeholder="you@example.com" required />
                 <button type="submit" id="login-btn" class="btn btn-primary">Continue with Email</button>
             </form>
             <div id="login-msg" class="login-message"></div>
-            <div class="login-footer">Secured with token-based authentication</div>
+            <div class="login-footer">
+                Secured with token-based authentication ·
+                <a href="legal/terms.html">Terms</a> ·
+                <a href="legal/privacy.html">Privacy</a>
+            </div>
         </div>
     </div>`;
 });
@@ -1308,6 +1354,15 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clean URL — remove ?token= but keep hash
         const hash = window.location.hash || '#/daily';
         window.history.replaceState({}, '', window.location.pathname + hash);
+    }
+    // Phase 13e: bind disclaimer dismiss once globally — survives route changes.
+    const dismiss = document.getElementById('disclaimer-dismiss');
+    if (dismiss) {
+        dismiss.addEventListener('click', () => {
+            sessionStorage.setItem('disclaimer-dismissed', '1');
+            const bar = document.getElementById('disclaimer-bar');
+            if (bar) bar.hidden = true;
+        });
     }
     Router.handleRoute();
 });

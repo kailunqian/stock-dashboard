@@ -20,7 +20,7 @@
     <!-- Inter font (Linear-style typography) — non-blocking, system fallback acceptable -->
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
-    <link rel="stylesheet" href="css/style.css?v=3.3">
+    <link rel="stylesheet" href="css/style.css?v=3.7">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
 </head>
 <body>
@@ -43,10 +43,35 @@
         </div>
     </nav>
 
+    <!-- Persistent legal disclaimer (authenticated pages only — toggled by app.js).
+         Dismissible per browser session via sessionStorage; never per account. -->
+    <div class="disclaimer-bar" id="disclaimer-bar" hidden role="note" aria-label="Legal disclaimer">
+        <span class="disclaimer-text">
+            <strong>Not financial advice.</strong> For informational purposes only.
+            See <a href="legal/terms.html">Terms</a> and <a href="legal/privacy.html">Privacy</a>.
+        </span>
+        <button type="button" class="disclaimer-dismiss" id="disclaimer-dismiss"
+                aria-label="Dismiss for this session">×</button>
+    </div>
+
     <!-- App content (SPA) -->
     <div class="main" id="app">
         <div class="loading-overlay"><div class="spinner"></div> Loading...</div>
     </div>
+
+    <!-- Footer with legal links — visible on every page so search engines + users
+         can find the policies even from the public landing/login page. -->
+    <footer class="site-footer" aria-label="Site footer">
+        <div class="site-footer-inner">
+            <span>© StockAnalysis</span>
+            <span class="dot">·</span>
+            <a href="legal/terms.html">Terms</a>
+            <span class="dot">·</span>
+            <a href="legal/privacy.html">Privacy</a>
+            <span class="dot">·</span>
+            <span class="muted">US &amp; Canada only</span>
+        </div>
+    </footer>
 
     <!-- Mobile bottom-nav (visibility gated by CSS: body.has-bottom-nav + @media <=768px) -->
     <nav class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
@@ -57,8 +82,8 @@
         <a href="#/system"      data-route="/system"      aria-label="System status"><span class="icon" aria-hidden="true">⚙️</span><span>System</span></a>
     </nav>
 
-    <script src="js/api.js?v=3.6"></script>
-    <script src="js/app.js?v=3.6"></script>
+    <script src="js/api.js?v=3.7"></script>
+    <script src="js/app.js?v=3.7"></script>
     <script>
         // PWA service worker — best-effort, fails silently on http://localhost
         if ('serviceWorker' in navigator) {
