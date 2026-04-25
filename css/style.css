@@ -2049,3 +2049,29 @@ tr.unlock-cta-row td {
     .landing-final-cta { padding: 40px 16px 56px; }
     .landing-final-cta h2 { font-size: 24px; }
 }
+
+
+/* Phase 13d.3: nav buttons must not stretch to 100% width */
+.landing-nav {
+    align-items: center;
+    flex-wrap: nowrap;
+}
+.landing-nav .btn-primary,
+.landing-nav .btn-ghost,
+.landing-nav .btn-unlock {
+    width: auto;
+    padding: 8px 16px;
+    font-size: 14px;
+    white-space: nowrap;
+    line-height: 1.2;
+    box-shadow: none;
+}
+.landing-nav .btn-primary {
+    background: linear-gradient(135deg, #f59e0b, #6366f1);
+    border: none;
+    color: #fff;
+}
+.landing-nav .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(99,102,241,0.3);
+}
