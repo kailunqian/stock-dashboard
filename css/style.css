@@ -1869,3 +1869,18 @@ body.is-impersonating{padding-top:28px;}
 @media (max-width:768px){
     .view-as-select{margin:0 0 8px 0;width:100%;}
 }
+
+
+/* Global safety net: any <select> inside the app should render its
+   options with our dark surface, not OS chrome. Targeted regression
+   tests enforce that every <select class> in index.html has matching
+   option styling. */
+select option,
+select optgroup{
+    background-color:#1a1d29;
+    color:#e7e9f0;
+}
+select option:checked{
+    background-color:#4f46e5;
+    color:#fff;
+}
