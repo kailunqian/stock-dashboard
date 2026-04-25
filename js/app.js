@@ -202,32 +202,35 @@ Router.register('/daily', async () => {
     const training = data.training || {};
     const model = data.model || {};
 
-    // Market regime banner
+    // Market regime banner — glass-style, on-brand
     const regime = scan.market_regime;
     let regimeBanner = '';
     if (regime) {
-        const colors = { bull: '#15803d', bear: '#dc3545', sideways: '#b8860b' };
+        const tints = { bull: 'success', bear: 'danger', sideways: 'warning' };
         const icons = { bull: '🐂', bear: '🐻', sideways: '↔️' };
-        const bgColors = { bull: '#f0fdf4', bear: '#fef2f2', sideways: '#fefce8' };
+        const tint = tints[regime.regime] || 'info';
         regimeBanner = `
-        <div style="background:${bgColors[regime.regime]};border-left:4px solid ${colors[regime.regime]};padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:16px">
-            <span style="font-size:18px">${icons[regime.regime]}</span>
-            <strong style="color:${colors[regime.regime]}">${regime.regime.toUpperCase()} Market</strong>
-            <span style="color:var(--text-secondary);margin-left:12px;font-size:13px">${regime.description || ''}</span>
-            ${regime.vix ? `<span style="float:right;font-size:13px">VIX: ${regime.vix}</span>` : ''}
+        <div class="glass" style="padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+            <span style="font-size:24px;line-height:1">${icons[regime.regime] || '📊'}</span>
+            <span class="pill pill-${tint==='success'?'green':tint==='danger'?'red':tint==='warning'?'yellow':'blue'} live">${regime.regime.toUpperCase()} Market</span>
+            <span style="color:var(--text-secondary);font-size:14px;flex:1;min-width:200px">${regime.description || ''}</span>
+            ${regime.vix ? `<span style="font-size:13px;color:var(--text-secondary)">VIX <strong style="color:var(--text-primary)">${regime.vix}</strong></span>` : ''}
         </div>`;
     }
 
-    // Today's picks only — no conviction/historical mixing
+    // Today's picks — score-ring in the score column for visual punch
     let picksHtml = '';
     if (scan.top_picks && scan.top_picks.length > 0) {
         picksHtml = scan.top_picks.map(p => {
             const keySignal = (p.signals || [])[0] || '—';
+            const sc = Math.max(0, Math.min(100, Math.round(p.score || 0)));
+            const ringClass = sc >= 85 ? 'success' : sc >= 70 ? '' : 'danger';
+            const ring = `<div class="score-ring ${ringClass}" style="--score:${sc};--size:42px"><span>${sc}</span></div>`;
             return `
             <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="cursor:pointer">
                 <td><strong>${p.symbol}</strong></td>
                 <td>${p.recommendation ? recPill(p.recommendation) : '—'}</td>
-                <td>${p.score?.toFixed(0) || '—'}</td>
+                <td>${ring}</td>
                 <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : (p.current_price ? '$' + p.current_price.toFixed(2) : '—')}</td>
                 <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
                 <td>${p.stop_loss ? '$' + p.stop_loss.toFixed(2) : '—'}</td>
@@ -258,40 +261,71 @@ Router.register('/daily', async () => {
     }
 
     const strongBuyCount = (scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length;
+    const accPct = model.accuracy ? `${(model.accuracy * 100).toFixed(0)}%` : '—';
+    const topPickSym = scan.top_pick || '—';
+    const topPickScore = scan.top_score ? scan.top_score.toFixed(0) : '—';
 
     return `
-    <div class="page-title">Daily Report</div>
+    <div class="hero">
+        <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
+        <h1>Today's signal across ${scan.stocks_scanned || '—'} stocks.</h1>
+        <p class="hero-sub">AI-ranked picks combining technical, fundamental, momentum, news, and ML signals. Click any row for the full breakdown.</p>
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <span class="hero-stat-label">Strong Buy</span>
+                <span class="hero-stat-value" style="background:var(--gradient-success);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block;padding-bottom:0.08em">${strongBuyCount}</span>
+            </div>
+            <div class="hero-stat">
+                <span class="hero-stat-label">Top Pick</span>
+                <span class="hero-stat-value">${topPickSym}<span style="font-size:0.55em;color:var(--text-secondary);font-weight:600;margin-left:8px">${topPickScore}</span></span>
+            </div>
+            <div class="hero-stat">
+                <span class="hero-stat-label">Actionable (≥70)</span>
+                <span class="hero-stat-value">${scan.actionable || 0}</span>
+            </div>
+            <div class="hero-stat">
+                <span class="hero-stat-label">Model Accuracy</span>
+                <span class="hero-stat-value">${accPct}</span>
+            </div>
+        </div>
+    </div>
 
     ${regimeBanner}
 
     <div class="card-grid">
-        <div class="card" style="border-left:4px solid var(--accent-green);${strongBuyCount > 0 ? 'background:var(--green-bg, #f0fdf4)' : ''}">
-            <div class="card-title">🔥 Strong Buy</div>
-            <div class="card-value positive" style="font-size:32px">${strongBuyCount}</div>
+        <div class="card featured" data-tier="strong-buy">
+            <div class="card-header">
+                <div class="card-title">🔥 Strong Buy</div>
+                ${strongBuyCount > 0 ? '<span class="pill pill-green live">live</span>' : ''}
+            </div>
+            <div class="card-value positive">${strongBuyCount}</div>
             <div class="card-subtitle">Score ≥ 85, no risks</div>
-            <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">${scan.actionable || 0} actionable total (≥70)</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:6px">${scan.actionable || 0} actionable total (≥70)</div>
         </div>
         <div class="card">
-            <div class="card-title">Stocks Scanned</div>
+            <div class="card-header"><div class="card-title">Stocks Scanned</div></div>
             <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
             <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
-            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary)">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
+            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
         </div>
         <div class="card">
-            <div class="card-title">Top Pick</div>
+            <div class="card-header">
+                <div class="card-title">Top Pick</div>
+                ${scan.top_score ? `<div class="score-ring success" style="--score:${Math.round(scan.top_score)};--size:48px"><span>${scan.top_score.toFixed(0)}</span></div>` : ''}
+            </div>
             <div class="card-value neutral">${scan.top_pick || '—'}</div>
-            <div class="card-subtitle">Score: ${scan.top_score?.toFixed(0) || '—'}</div>
+            <div class="card-subtitle">Highest composite score today</div>
         </div>
         <div class="card">
-            <div class="card-title">ML Model</div>
-            <div class="card-value neutral">${model.version || training.model_version || '—'}</div>
+            <div class="card-header"><div class="card-title">ML Model</div></div>
+            <div class="card-value neutral" style="font-size:clamp(20px, 2.4vw, 28px)">${model.version || training.model_version || '—'}</div>
             <div class="card-subtitle">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
         </div>
         ${trainingHtml}
     </div>
 
     <div class="table-container">
-        <div class="table-header">Today's Picks</div>
+        <div class="table-header">Today's Picks <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span></div>
         <table>
             <thead>
                 <tr>
