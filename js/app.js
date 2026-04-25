@@ -1134,8 +1134,8 @@ Router.register('/system', async () => {
     <div class="card-grid">
         <div class="card">
             <div class="card-title">ML Model</div>
-            <div class="card-value neutral">v${model.version || '?'}</div>
-            <div class="card-subtitle">Features: ${model.feature_count || '?'}</div>
+            <div class="card-value code">v${model.version || '?'}</div>
+            <div class="card-subtitle" style="margin-top:8px">Features: ${model.feature_count || '?'}</div>
             ${model.accuracy ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Accuracy: ${(model.accuracy * 100).toFixed(1)}%</div>` : ''}
             ${model.auc_roc ? `<div style="font-size:13px;color:var(--text-secondary)">AUC-ROC: ${(model.auc_roc * 100).toFixed(1)}%</div>` : ''}
             <div style="font-size:13px;color:var(--text-secondary)">Sources: ${sourcesStr}</div>
