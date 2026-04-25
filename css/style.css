@@ -1813,3 +1813,25 @@ kbd, .kbd {
         grid-template-columns:1fr;gap:18px;padding:24px 18px;margin-bottom:32px;
     }
 }
+
+
+/* Fix country dropdown readability — native <select> options inherit OS chrome */
+select.login-input{
+    color:var(--text-primary)!important;
+    background:var(--surface)!important;
+    appearance:none;-webkit-appearance:none;-moz-appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='none' stroke='%23a0a8b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M1 1l5 5 5-5'/></svg>");
+    background-repeat:no-repeat;
+    background-position:right 16px center;
+    padding-right:42px;
+}
+select.login-input option{
+    background:var(--surface);
+    color:var(--text-primary);
+    padding:8px 12px;
+}
+select.login-input option:checked,
+select.login-input option:hover{
+    background:var(--accent);
+    color:#fff;
+}

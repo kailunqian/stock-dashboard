@@ -175,6 +175,38 @@ const API = {
         return body;
     },
 
+    // Phase 13d.2: super-admin manages co-admins
+    async listCoAdmins() {
+        const resp = await fetch(`${this.base}/api/admin/co-admins`, {
+            headers: this.headers(), credentials: 'include',
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to load');
+        return body.co_admins || [];
+    },
+    async addCoAdmin(email) {
+        const resp = await fetch(`${this.base}/api/admin/co-admins`, {
+            method: 'POST',
+            headers: { ...this.headers(), 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to add');
+        return body;
+    },
+    async removeCoAdmin(email) {
+        const resp = await fetch(`${this.base}/api/admin/co-admins`, {
+            method: 'DELETE',
+            headers: { ...this.headers(), 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to remove');
+        return body;
+    },
+
     async checkAuth() {
         const now = Date.now();
         if (this._authCache && this._authCache.expires > now) {

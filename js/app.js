@@ -70,14 +70,25 @@ const Router = {
             // CSS via `body.has-bottom-nav` + @media (max-width: 768px).
             document.body.classList.add('has-bottom-nav');
             // Phase 13d.1: hide admin-only nav links from non-admins.
+            // Phase 13d.2: separate super-admin gate for /admin (co-admin mgmt).
             const isAdmin = !!auth.is_admin;
+            const isSuperAdmin = !!auth.is_super_admin;
             document.body.classList.toggle('is-admin', isAdmin);
+            document.body.classList.toggle('is-super-admin', isSuperAdmin);
             document.querySelectorAll('[data-admin-only]').forEach(el => {
                 el.style.display = isAdmin ? '' : 'none';
             });
+            document.querySelectorAll('[data-super-admin-only]').forEach(el => {
+                el.style.display = isSuperAdmin ? '' : 'none';
+            });
             // Block direct hash navigation to admin pages too.
             const ADMIN_ROUTES = new Set(['/budget', '/system']);
+            const SUPER_ADMIN_ROUTES = new Set(['/admin']);
             if (!isAdmin && ADMIN_ROUTES.has(path)) {
+                window.location.hash = '#/daily';
+                return;
+            }
+            if (!isSuperAdmin && SUPER_ADMIN_ROUTES.has(path)) {
                 window.location.hash = '#/daily';
                 return;
             }
@@ -1439,6 +1450,114 @@ Router.register('/billing', async () => {
                 US &amp; Canada only at this time. Sales tax handled by Stripe.
             </div>
         </div>
+    </div>
+    `;
+});
+
+// ── Admin Page (Phase 13d.2 — super-admin only) ──────────────────────
+Router.register('/admin', async () => {
+    const wireUp = () => {
+        const addBtn = document.getElementById('coadmin-add-btn');
+        if (addBtn) addBtn.addEventListener('click', async () => {
+            const inp = document.getElementById('coadmin-email');
+            const msg = document.getElementById('coadmin-msg');
+            const email = (inp.value || '').trim();
+            if (!email || !email.includes('@')) {
+                msg.textContent = 'Enter a valid email.';
+                msg.style.color = '#e57373';
+                return;
+            }
+            addBtn.disabled = true;
+            try {
+                await API.addCoAdmin(email);
+                inp.value = '';
+                msg.textContent = `Added ${email}.`;
+                msg.style.color = '';
+                Router.handleRoute();
+            } catch (e) {
+                msg.textContent = e.message || 'Failed to add';
+                msg.style.color = '#e57373';
+            } finally {
+                addBtn.disabled = false;
+            }
+        });
+        document.querySelectorAll('[data-coadmin-remove]').forEach(b => {
+            b.addEventListener('click', async () => {
+                const email = b.getAttribute('data-coadmin-remove');
+                if (!confirm(`Remove ${email} as co-admin?`)) return;
+                b.disabled = true;
+                try {
+                    await API.removeCoAdmin(email);
+                    Router.handleRoute();
+                } catch (e) {
+                    alert(e.message || 'Failed to remove');
+                    b.disabled = false;
+                }
+            });
+        });
+    };
+    setTimeout(wireUp, 50);
+
+    let coAdmins = [];
+    let loadError = null;
+    try {
+        coAdmins = await API.listCoAdmins();
+    } catch (e) {
+        loadError = e.message;
+    }
+
+    const rows = coAdmins.length === 0
+        ? `<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:24px">
+              No co-admins yet. Promote someone below.
+           </td></tr>`
+        : coAdmins.map(u => `
+            <tr>
+                <td><strong>${u.email}</strong></td>
+                <td><span class="pill pill-blue">${u.plan_tier || '—'}</span></td>
+                <td style="text-align:right">
+                    <button class="btn btn-ghost" data-coadmin-remove="${u.email}">Remove</button>
+                </td>
+            </tr>`).join('');
+
+    return `
+    <div class="page-eyebrow">Admin · Co-Admin Management</div>
+    <div class="card-grid" style="grid-template-columns:1fr">
+        <div class="card">
+            <div class="card-title">About co-admins</div>
+            <div style="color:var(--text-secondary);font-size:14px;line-height:1.7;margin-top:8px">
+                Co-admins get full feature access (treated as Pro / no payment) and
+                can see all dashboard pages including <strong>Budget</strong> and
+                <strong>System</strong>. They <em>cannot</em> manage other co-admins —
+                only super-admins (configured via <code>ADMIN_EMAILS</code> Azure app
+                setting) can promote or demote.
+            </div>
+        </div>
+    </div>
+
+    ${loadError ? `<div class="glass" style="margin:16px 0;border-color:rgba(229,115,115,0.3);padding:12px 16px">
+        ❌ ${loadError}
+    </div>` : ''}
+
+    <div class="table-container" style="margin-top:18px">
+        <div class="table-header">
+            Co-Admins <span class="pill pill-blue" style="margin-left:auto">${coAdmins.length}</span>
+        </div>
+        <table>
+            <thead>
+                <tr><th>Email</th><th>Plan tier</th><th style="text-align:right">Action</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+        <div class="card-title">Add co-admin</div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <input id="coadmin-email" type="email" placeholder="email@example.com"
+                   class="login-input" style="flex:1;min-width:240px;margin:0" />
+            <button id="coadmin-add-btn" class="btn btn-primary">Promote to co-admin</button>
+        </div>
+        <div id="coadmin-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
     </div>
     `;
 });
