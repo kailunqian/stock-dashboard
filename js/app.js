@@ -268,8 +268,6 @@ Router.register('/daily', async () => {
     return `
     <div class="hero">
         <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
-        <h1>Today's signal across ${scan.stocks_scanned || '—'} stocks.</h1>
-        <p class="hero-sub">AI-ranked picks combining technical, fundamental, momentum, news, and ML signals. Click any row for the full breakdown.</p>
         <div class="hero-stats">
             <div class="hero-stat">
                 <span class="hero-stat-label">Strong Buy</span>
