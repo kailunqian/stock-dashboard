@@ -1,6 +1,27 @@
 /* StockAnalysis Dashboard — SPA Router + Page Renderers */
 
 // ── Phase 13d: Paywall card (shared) ────────────────────────────────
+function effectiveViewAsTier() {
+    try { return localStorage.getItem('viewAsTier') || 'real'; } catch (_) { return 'real'; }
+}
+function blurredTeaser(innerHtml, title, subtitle) {
+    return `
+    <div class="teaser-wrap">
+        <div class="teaser-content">${innerHtml}</div>
+        <div class="teaser-overlay">
+            <div class="teaser-card glass">
+                <div style="font-size:32px;margin-bottom:8px">🔒</div>
+                <h2 style="margin:0 0 8px">${title || 'Pro feature'}</h2>
+                <p style="color:var(--text-secondary);margin:0 0 18px;max-width:420px">
+                    ${subtitle || 'Upgrade to Pro to unlock the full experience — daily picks, per-stock drilldowns, performance analytics, and real-time alerts.'}
+                </p>
+                <a href="#/billing" class="btn-primary" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#6366f1);color:#fff;padding:12px 24px;border-radius:8px;font-weight:600;text-decoration:none">
+                    Unlock with Pro →
+                </a>
+            </div>
+        </div>
+    </div>`;
+}
 function paywallCard(reasonHtml, message, statsObj) {
     const stats = statsObj || {};
     const m = stats.model || {};
@@ -764,6 +785,14 @@ Router.register('/pipeline', async () => {
 Router.register('/performance', async () => {
     const data = await API.performance();
     if (!data) return '<p>Failed to load</p>';
+    // Phase 13d.3: Performance is Pro-only — blur teaser for Free impersonation
+    if (effectiveViewAsTier() === 'free') {
+        return blurredTeaser(
+            `<div class="card"><div class="card-title">30D Performance</div><div class="card-value positive">62%</div><div class="card-subtitle">🟢 Sample data</div></div>`,
+            'Performance analytics is Pro',
+            'See historical hit-rate, alpha vs SPY, calibration curves, and per-strategy breakdowns. Pro only.'
+        );
+    }
 
     const sc = data.scorecard?.scorecards || {};
     const card = sc.all || sc['30d'] || {};
@@ -1256,6 +1285,14 @@ Router.register('/stock', async () => {
 
 // Dynamic stock route handler
 async function renderStockDetail(symbol) {
+    // Phase 13d.3: per-stock drilldown is Pro — blur teaser for Free impersonation
+    if (effectiveViewAsTier() === 'free') {
+        return blurredTeaser(
+            `<div class="card"><h2>${symbol}</h2><p>Score breakdown, technicals, fundamentals, news sentiment, and signal pipeline.</p></div>`,
+            `${symbol} drilldown is Pro`,
+            'Get full per-stock analysis: technical indicators, fundamentals, news sentiment, signal pipeline, and entry/exit guidance. Pro only.'
+        );
+    }
     const data = await API.stock(symbol);
     if (!data) return `<div class="card"><p>❌ Failed to load</p></div>`;
     if (data.tier_gated) return paywallCard(

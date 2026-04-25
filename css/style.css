@@ -1939,3 +1939,31 @@ tr.unlock-cta-row td {
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(99,102,241,0.35);
 }
+
+
+/* Phase 13d.3: full-page blur teaser (Performance, Stock detail) */
+.teaser-wrap {
+    position: relative;
+    min-height: 60vh;
+}
+.teaser-wrap .teaser-content {
+    filter: blur(8px);
+    opacity: 0.4;
+    pointer-events: none;
+    user-select: none;
+}
+.teaser-wrap .teaser-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+.teaser-wrap .teaser-card {
+    text-align: center;
+    padding: 36px 32px;
+    max-width: 520px;
+    border: 1px solid rgba(255,180,80,0.30);
+    background: linear-gradient(135deg, rgba(255,180,80,0.08), rgba(99,102,241,0.08));
+}
