@@ -126,6 +126,33 @@ const API = {
         }).then(r => r.json());
     },
 
+    // Phase 13b SaaS: public signup. Returns the same {ok, message} shape
+    // as login. Server returns 503 when SAAS_ENABLED is off — we surface
+    // a friendly error in that case.
+    async signup(email, country) {
+        const resp = await fetch(`${this.base}/api/auth/signup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email, country }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Signup failed');
+        return body;
+    },
+
+    async magicLink(email) {
+        const resp = await fetch(`${this.base}/api/auth/magic-link`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Request failed');
+        return body;
+    },
+
     async checkAuth() {
         const now = Date.now();
         if (this._authCache && this._authCache.expires > now) {

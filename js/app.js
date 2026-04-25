@@ -30,7 +30,9 @@ const Router = {
 
         // Auth check (skip for login). Memoized in API.checkAuth so navigation
         // between routes within AUTH_TTL_MS doesn't burn an extra round-trip.
-        if (path !== '/login') {
+        // Public (unauthenticated) routes — login, signup
+        const PUBLIC_ROUTES = new Set(['/login', '/signup']);
+        if (!PUBLIC_ROUTES.has(path)) {
             const auth = await API.checkAuth();
             if (!auth.authenticated) {
                 window.location.hash = '#/login';
@@ -230,9 +232,82 @@ Router.register('/login', async () => {
             </form>
             <div id="login-msg" class="login-message"></div>
             <div class="login-footer">
+                New here? <a href="#/signup">Create an account</a><br>
                 Secured with token-based authentication ·
                 <a href="legal/terms.html">Terms</a> ·
                 <a href="legal/privacy.html">Privacy</a>
+            </div>
+        </div>
+    </div>`;
+});
+
+// ── Signup Page (Phase 13b) ──────────────────────────────────────────
+Router.register('/signup', async () => {
+    setTimeout(() => {
+        const form = document.getElementById('signup-form');
+        if (form) form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('signup-email').value;
+            const country = document.getElementById('signup-country').value;
+            const tos = document.getElementById('signup-tos').checked;
+            const btn = document.getElementById('signup-btn');
+            const msg = document.getElementById('signup-msg');
+            if (!tos) {
+                msg.className = 'login-message login-error';
+                msg.textContent = 'Please accept the Terms and Privacy Policy.';
+                return;
+            }
+            btn.disabled = true;
+            btn.textContent = 'Creating account...';
+            try {
+                await API.signup(email, country);
+                msg.className = 'login-message';
+                msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email to verify and sign in';
+            } catch (err) {
+                msg.className = 'login-message login-error';
+                msg.textContent = err.message || 'Signup failed. Try again.';
+            }
+            btn.disabled = false;
+            btn.textContent = 'Create Account';
+        });
+    }, 50);
+
+    return `
+    <section class="landing-hero" aria-label="Create your account">
+        <div class="badge">Free to start · $9/mo Pro</div>
+        <h1>Create your account</h1>
+        <p>Get one delayed pick per day for free, or upgrade to Pro for real-time
+           access to every signal, full history, and stock drilldowns.</p>
+    </section>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-logo">
+                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <h1>Sign up</h1>
+            <p>Passwordless — we'll email you a sign-in link.</p>
+            <form id="signup-form">
+                <input type="email" id="signup-email" class="login-input"
+                       placeholder="you@example.com" required autocomplete="email" />
+                <select id="signup-country" class="login-input" required
+                        aria-label="Country" style="background:var(--surface);color:var(--text-primary)">
+                    <option value="">Select country</option>
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                </select>
+                <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;
+                              color:var(--text-secondary);text-align:left;margin:8px 0 12px;line-height:1.5">
+                    <input type="checkbox" id="signup-tos" style="margin-top:3px;flex-shrink:0" required />
+                    <span>I agree to the <a href="legal/terms.html">Terms</a> and
+                          <a href="legal/privacy.html">Privacy Policy</a>, and understand
+                          this is not financial advice.</span>
+                </label>
+                <button type="submit" id="signup-btn" class="btn btn-primary">Create Account</button>
+            </form>
+            <div id="signup-msg" class="login-message"></div>
+            <div class="login-footer">
+                Already have an account? <a href="#/login">Sign in</a><br>
+                US &amp; Canada only at this time.
             </div>
         </div>
     </div>`;
