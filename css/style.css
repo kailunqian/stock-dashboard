@@ -457,6 +457,7 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
 .login-message svg {
     width: 16px;
     height: 16px;
+    flex-shrink: 0;
     fill: none;
     stroke: currentColor;
     stroke-width: 2;
@@ -496,13 +497,135 @@ tr:hover { background: rgba(88, 166, 255, 0.04); }
     gap: 12px;
 }
 
-/* Responsive */
+/* ── Mobile UX (≤ 768px) ─────────────────────────────────── */
 @media (max-width: 768px) {
-    .nav { padding: 0 12px; }
-    .nav-links a { padding: 6px 10px; font-size: 13px; }
-    .main { padding: 16px; }
-    .card-grid { grid-template-columns: 1fr; }
-    .hide-mobile { display: none; }
+    /* Safe area insets for notched phones (iPhone X+, Android with cutouts) */
+    body {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    /* ─ Nav: compact, tap-friendly, horizontally scrollable links ─ */
+    .nav {
+        padding: 0 12px;
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+        height: 52px;
+        gap: 8px;
+    }
+    .nav-brand {
+        font-size: 14px;
+        margin-right: 0;
+        flex-shrink: 0;
+    }
+    .nav-brand .nav-logo {
+        width: 20px;
+        height: 20px;
+    }
+    .nav-links {
+        flex: 1;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        gap: 2px;
+        margin: 0 4px;
+    }
+    .nav-links::-webkit-scrollbar { display: none; }
+    .nav-links a {
+        padding: 0 12px;
+        font-size: 13px;
+        white-space: nowrap;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    /* Hide email on mobile — keep just the logout button as the user marker */
+    .nav-user #user-email { display: none; }
+    .nav-user .logout {
+        font-size: 13px;
+        padding: 8px 12px;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        flex-shrink: 0;
+    }
+
+    /* ─ Page chrome ─ */
+    .main {
+        padding: 16px 12px;
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+    .page-title {
+        font-size: 20px;
+        margin-bottom: 16px;
+    }
+
+    /* ─ Cards: single column, tighter padding, smaller hero numbers ─ */
+    .card-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+    .card { padding: 16px; }
+    .card-value { font-size: 28px; }
+
+    /* Hide opt-out columns/elements */
+    .hide-mobile { display: none !important; }
+
+    /* ─ Tables: horizontally scrollable, retain semantics ─
+       Tables that have many columns (e.g. Daily picks, Strategy leaderboard)
+       no longer overflow the viewport — they scroll horizontally inside their
+       row. Touch-momentum scroll on iOS. */
+    .main table {
+        display: block;
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .main table thead,
+    .main table tbody,
+    .main table tfoot {
+        display: table;
+        width: 100%;
+        min-width: max-content;
+    }
+    .main th, .main td {
+        padding: 10px 12px;
+        font-size: 13px;
+        white-space: nowrap;
+    }
+    /* Subtle right-edge fade hints scrollability */
+    .table-container {
+        position: relative;
+    }
+    .table-container::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 24px;
+        height: 100%;
+        background: linear-gradient(to right, transparent, var(--bg-card));
+        pointer-events: none;
+        opacity: 0.6;
+    }
+
+    /* ─ Touch-friendly buttons & pills ─ */
+    .btn { padding: 12px 20px; min-height: 44px; }
+    .pill { padding: 4px 10px; font-size: 12px; }
+
+    /* ─ Login: tighter padding on small screens, but still comfortable ─ */
+    .login-box { padding: 36px 24px; border-radius: 14px; }
+    .login-box h1 { font-size: 20px; }
+}
+
+/* ── Very small screens (≤ 380px) ─────────────────────────── */
+@media (max-width: 380px) {
+    .nav-brand { font-size: 0; gap: 0; }
+    .nav-brand .nav-logo { width: 24px; height: 24px; }
+    .card-value { font-size: 24px; }
+    .page-title { font-size: 18px; }
 }
 
 /* ── Analysis Pipeline — compact card-grid flow ─────────────────── */
