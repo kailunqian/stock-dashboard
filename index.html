@@ -2,19 +2,29 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#0d1117">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=yes">
+    <meta name="theme-color" content="#08090A">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="StockAnalysis">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="description" content="AI-powered stock analysis dashboard — daily picks, ML metrics, performance tracking.">
     <title>StockAnalysis Dashboard</title>
-    <!-- Preconnect to API + chart CDN so DNS+TLS happen during HTML parse -->
+    <!-- PWA manifest + iOS Add-to-Home-Screen -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 fill=%22%2308090A%22 rx=%2222%22/><polyline points=%2280 50 68 50 58 80 42 20 32 50 20 50%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%226%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>">
+    <!-- Preconnect to API + chart CDN + font CDN so DNS+TLS happen during HTML parse -->
     <link rel="preconnect" href="https://func-stockanalysis-oksq5n.azurewebsites.net" crossorigin>
+    <link rel="preconnect" href="https://rsms.me" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-    <link rel="stylesheet" href="css/style.css?v=2.18">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%2258a6ff%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
+    <!-- Inter font (Linear-style typography) — non-blocking, system fallback acceptable -->
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
+    <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
+    <link rel="stylesheet" href="css/style.css?v=3.0">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
 </head>
 <body>
-    <!-- Navigation -->
+    <!-- Top navigation -->
     <nav class="nav" id="nav" style="display:none">
         <a href="#/daily" class="nav-brand">
             <svg class="nav-logo" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -38,7 +48,24 @@
         <div class="loading-overlay"><div class="spinner"></div> Loading...</div>
     </div>
 
-    <script src="js/api.js?v=2.18"></script>
-    <script src="js/app.js?v=2.18"></script>
+    <!-- Mobile bottom-nav (visibility gated by CSS: body.has-bottom-nav + @media <=768px) -->
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
+        <a href="#/daily"       data-route="/daily"       aria-label="Daily picks"><span class="icon" aria-hidden="true">📊</span><span>Daily</span></a>
+        <a href="#/performance" data-route="/performance" aria-label="Performance"><span class="icon" aria-hidden="true">📈</span><span>Perf</span></a>
+        <a href="#/pipeline"    data-route="/pipeline"    aria-label="Pipeline"><span class="icon" aria-hidden="true">🔀</span><span>Pipeline</span></a>
+        <a href="#/budget"      data-route="/budget"      aria-label="Budget"><span class="icon" aria-hidden="true">💰</span><span>Budget</span></a>
+        <a href="#/system"      data-route="/system"      aria-label="System status"><span class="icon" aria-hidden="true">⚙️</span><span>System</span></a>
+    </nav>
+
+    <script src="js/api.js?v=3.0"></script>
+    <script src="js/app.js?v=3.0"></script>
+    <script>
+        // PWA service worker — best-effort, fails silently on http://localhost
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').catch(() => {});
+            });
+        }
+    </script>
 </body>
 </html>

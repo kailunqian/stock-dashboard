@@ -1,0 +1,26 @@
+{
+  "name": "StockAnalysis Dashboard",
+  "short_name": "StockAnalysis",
+  "description": "AI-powered stock analysis — daily picks, ML metrics, performance tracking.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#08090A",
+  "theme_color": "#08090A",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2308090A' rx='42'/><polyline points='154 96 130 96 112 154 80 38 62 96 38 96' fill='none' stroke='%235E6AD2' stroke-width='12' stroke-linecap='round' stroke-linejoin='round'/></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%2308090A' rx='112'/><polyline points='410 256 346 256 298 410 214 102 166 256 102 256' fill='none' stroke='%235E6AD2' stroke-width='32' stroke-linecap='round' stroke-linejoin='round'/></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

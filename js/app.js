@@ -38,12 +38,16 @@ const Router = {
             }
             document.getElementById('user-email').textContent = auth.email;
             document.getElementById('nav').style.display = 'flex';
+            // Bottom-nav: visible on mobile only — controlled entirely by
+            // CSS via `body.has-bottom-nav` + @media (max-width: 768px).
+            document.body.classList.add('has-bottom-nav');
         } else {
             document.getElementById('nav').style.display = 'none';
+            document.body.classList.remove('has-bottom-nav');
         }
 
-        // Highlight active nav
-        document.querySelectorAll('.nav-links a').forEach(a => {
+        // Highlight active nav (top + bottom)
+        document.querySelectorAll('.nav-links a, .bottom-nav a').forEach(a => {
             a.classList.toggle('active', a.getAttribute('href') === `#${path}`);
         });
 
@@ -1144,6 +1148,7 @@ Router.handleRoute = async function() {
         if (!auth.authenticated) { window.location.hash = '#/login'; return; }
         document.getElementById('user-email').textContent = auth.email;
         document.getElementById('nav').style.display = 'flex';
+        document.body.classList.add('has-bottom-nav');
         const main = document.getElementById('app');
         main.innerHTML = '<div class="loading-overlay"><div class="spinner"></div> Loading...</div>';
         main.innerHTML = await renderStockDetail(stockMatch[1].toUpperCase());
