@@ -153,6 +153,28 @@ const API = {
         return body;
     },
 
+    // Phase 13c: Stripe billing
+    async billingCheckout() {
+        const resp = await fetch(`${this.base}/api/billing/checkout`, {
+            method: 'POST',
+            headers: this.headers(),
+            credentials: 'include',
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Could not start checkout');
+        return body;
+    },
+    async billingPortal() {
+        const resp = await fetch(`${this.base}/api/billing/portal`, {
+            method: 'POST',
+            headers: this.headers(),
+            credentials: 'include',
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Could not open portal');
+        return body;
+    },
+
     async checkAuth() {
         const now = Date.now();
         if (this._authCache && this._authCache.expires > now) {

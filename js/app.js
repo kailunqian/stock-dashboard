@@ -1271,6 +1271,95 @@ Router.register('/system', async () => {
     </div>`;
 });
 
+// ── Billing Page (Phase 13c) ─────────────────────────────────────────
+Router.register('/billing', async () => {
+    setTimeout(() => {
+        const upgradeBtn = document.getElementById('billing-upgrade');
+        if (upgradeBtn) upgradeBtn.addEventListener('click', async () => {
+            upgradeBtn.disabled = true;
+            upgradeBtn.textContent = 'Starting checkout...';
+            try {
+                const { url } = await API.billingCheckout();
+                window.location.href = url;
+            } catch (e) {
+                document.getElementById('billing-msg').textContent = e.message;
+                upgradeBtn.disabled = false;
+                upgradeBtn.textContent = 'Upgrade to Pro — $9/mo';
+            }
+        });
+        const portalBtn = document.getElementById('billing-portal');
+        if (portalBtn) portalBtn.addEventListener('click', async () => {
+            portalBtn.disabled = true;
+            portalBtn.textContent = 'Opening portal...';
+            try {
+                const { url } = await API.billingPortal();
+                window.location.href = url;
+            } catch (e) {
+                document.getElementById('billing-msg').textContent = e.message;
+                portalBtn.disabled = false;
+                portalBtn.textContent = 'Manage Subscription';
+            }
+        });
+    }, 50);
+
+    // Display query-string status from Stripe redirect
+    let banner = '';
+    const hash = window.location.hash;
+    if (hash.includes('status=success')) {
+        banner = `<div class="glass" style="margin-bottom:16px;border-color:rgba(80,200,120,0.3)">
+            <strong style="color:#5acc78">✓ Subscription active.</strong>
+            Your account is being upgraded — refresh in a moment if Pro features
+            don't appear yet.</div>`;
+    } else if (hash.includes('status=cancelled')) {
+        banner = `<div class="glass" style="margin-bottom:16px">Checkout was cancelled.
+            No charges were made.</div>`;
+    }
+
+    const me = await API.checkAuth();
+    const isPro = (me && me.tier === 'pro');
+
+    return `
+    <div class="page-eyebrow">Billing</div>
+    ${banner}
+    <div class="card-grid">
+        <div class="card featured" data-tier="${isPro ? 'strong-buy' : ''}">
+            <div class="card-title">${isPro ? 'Pro Plan' : 'Free Plan'}</div>
+            <div class="card-value">${isPro ? '$9/mo' : '$0'}</div>
+            <div class="card-subtitle">
+                ${isPro
+                    ? 'Real-time picks, full history, charts, drilldowns, watchlist'
+                    : 'Top 1 pick/day · 24h delay · 7-day history'}
+            </div>
+            <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+                ${isPro
+                    ? '<button id="billing-portal" class="btn">Manage Subscription</button>'
+                    : '<button id="billing-upgrade" class="btn btn-primary">Upgrade to Pro — $9/mo</button>'}
+            </div>
+            <div id="billing-msg" style="margin-top:10px;font-size:13px;color:#e57373"></div>
+        </div>
+        <div class="card">
+            <div class="card-title">What you get with Pro</div>
+            <ul style="margin:8px 0 0;padding-left:20px;color:var(--text-secondary);font-size:14px;line-height:1.8">
+                <li>All daily picks, real-time (no 24h delay)</li>
+                <li>Full performance &amp; calibration history</li>
+                <li>Per-stock drilldown + interactive charts</li>
+                <li>Unlimited watchlist</li>
+                <li>Pre-market and post-market scans</li>
+            </ul>
+        </div>
+        <div class="card">
+            <div class="card-title">Billing details</div>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+                Payment processed by <strong>Stripe</strong>. We never see your card.<br>
+                Cancel anytime from the billing portal — you keep access through
+                the paid period.<br>
+                US &amp; Canada only at this time. Sales tax handled by Stripe.
+            </div>
+        </div>
+    </div>
+    `;
+});
+
 // ── Init ────────────────────────────────────────────────────────────
 
 // Handle dynamic /stock/:symbol routes
