@@ -1,5 +1,31 @@
 /* StockAnalysis Dashboard — SPA Router + Page Renderers */
 
+// ── Phase 13d: Paywall card (shared) ────────────────────────────────
+function paywallCard(reasonHtml, message, statsObj) {
+    const stats = statsObj || {};
+    const m = stats.model || {};
+    const t = stats.training_status || stats.training || {};
+    const metaRow = (m.accuracy || t.trained_at) ? `
+        <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;
+                    font-size:13px;color:var(--text-secondary)">
+            ${m.accuracy ? `<div>Model accuracy: <strong style="color:var(--text-primary)">${(m.accuracy*100).toFixed(1)}%</strong></div>` : ''}
+            ${t.trained_at ? `<div>Last trained: <strong style="color:var(--text-primary)">${t.trained_at}</strong></div>` : ''}
+        </div>` : '';
+    return `
+    <div class="card featured" data-tier="strong-buy" style="text-align:center;padding:36px 24px">
+        <div style="font-size:32px;margin-bottom:12px">🔒</div>
+        <div class="card-title" style="font-size:20px;margin-bottom:8px">Pro Feature</div>
+        <div style="color:var(--text-secondary);max-width:520px;margin:0 auto 8px">
+            ${reasonHtml}
+        </div>
+        <div style="color:var(--text-secondary);max-width:520px;margin:0 auto 18px;font-size:14px">
+            ${message || 'Upgrade to Pro for full access — $9/mo.'}
+        </div>
+        <a href="#/billing" class="btn btn-primary">Upgrade to Pro — $9/mo</a>
+        ${metaRow}
+    </div>`;
+}
+
 // ── Lazy Chart.js loader (only when /performance is visited) ────────
 let _chartJsPromise = null;
 function ensureChartJs() {
@@ -319,9 +345,24 @@ Router.register('/daily', async () => {
     const data = await API.daily();
     if (!data) return '<p>Failed to load</p>';
 
+    // Phase 13d paywall: free tier with no picks → upgrade banner instead of empty page
+    if (data.tier_gated && (!data.predictions || data.predictions.length === 0)) {
+        const hrs = data.hours_until_unlock;
+        const reason = hrs != null
+            ? `Today's picks unlock for free users in <strong>${hrs} hours</strong>.`
+            : `Today's picks are Pro-only.`;
+        return paywallCard(reason, data.upgrade_message, /*showStats*/ data);
+    }
+
     const scan = data.scan || {};
     const training = data.training || {};
     const model = data.model || {};
+    const isLimited = !!data.tier_gated;
+    const limitedBanner = isLimited ? `
+        <div class="glass" style="padding:14px 18px;margin-bottom:18px;border-color:rgba(255,180,80,0.3)">
+            <strong>Free tier:</strong> showing top ${data.predictions.length} pick (delayed 24h).
+            <a href="#/billing" style="margin-left:8px">Upgrade to Pro →</a>
+        </div>` : '';
 
     // Market regime banner — glass-style, on-brand
     const regime = scan.market_regime;
@@ -391,6 +432,7 @@ Router.register('/daily', async () => {
         <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
     </div>
 
+    ${limitedBanner}
     ${regimeBanner}
 
     <div class="card-grid">
@@ -1055,7 +1097,11 @@ Router.register('/stock', async () => {
 // Dynamic stock route handler
 async function renderStockDetail(symbol) {
     const data = await API.stock(symbol);
-    if (!data || data.error) return `<div class="card"><p>❌ ${data?.error || 'Failed to load'}</p></div>`;
+    if (!data) return `<div class="card"><p>❌ Failed to load</p></div>`;
+    if (data.tier_gated) return paywallCard(
+        `Per-stock drilldown for <strong>${symbol}</strong> is a Pro feature.`,
+        data.upgrade_message);
+    if (data.error) return `<div class="card"><p>❌ ${data.error}</p></div>`;
 
     const scores = data.scores || {};
     const contribs = data.weighted_contributions || {};
