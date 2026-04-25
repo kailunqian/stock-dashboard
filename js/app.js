@@ -268,24 +268,6 @@ Router.register('/daily', async () => {
     return `
     <div class="hero">
         <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
-        <div class="hero-stats">
-            <div class="hero-stat">
-                <span class="hero-stat-label">Strong Buy</span>
-                <span class="hero-stat-value" style="background:var(--gradient-success);-webkit-background-clip:text;background-clip:text;color:transparent;display:inline-block;padding-bottom:0.08em">${strongBuyCount}</span>
-            </div>
-            <div class="hero-stat">
-                <span class="hero-stat-label">Top Pick</span>
-                <span class="hero-stat-value">${topPickSym}<span style="font-size:0.55em;color:var(--text-secondary);font-weight:600;margin-left:8px">${topPickScore}</span></span>
-            </div>
-            <div class="hero-stat">
-                <span class="hero-stat-label">Actionable (≥70)</span>
-                <span class="hero-stat-value">${scan.actionable || 0}</span>
-            </div>
-            <div class="hero-stat">
-                <span class="hero-stat-label">Model Accuracy</span>
-                <span class="hero-stat-value">${accPct}</span>
-            </div>
-        </div>
     </div>
 
     ${regimeBanner}
