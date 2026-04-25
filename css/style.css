@@ -2009,3 +2009,43 @@ tr.unlock-cta-row td {
     transform: translateY(-1px);
     box-shadow: 0 6px 16px rgba(99,102,241,0.35);
 }
+
+
+/* Phase 13d.3: public landing teaser sections */
+.landing-teaser {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 56px 24px;
+}
+.landing-teaser h2 {
+    font-size: 28px;
+    font-weight: 700;
+}
+.landing-final-cta {
+    text-align: center;
+    padding: 64px 24px 80px;
+    max-width: 720px;
+    margin: 0 auto;
+}
+.landing-final-cta h2 {
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+.landing-final-cta p {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+}
+.legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+@media (max-width: 768px) {
+    .landing-teaser { padding: 36px 16px; }
+    .landing-teaser h2 { font-size: 22px; }
+    .landing-final-cta { padding: 40px 16px 56px; }
+    .landing-final-cta h2 { font-size: 24px; }
+}

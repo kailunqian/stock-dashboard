@@ -313,20 +313,49 @@ Router.register('/login', async () => {
             const email = document.getElementById('login-email').value;
             const btn = document.getElementById('login-btn');
             const msg = document.getElementById('login-msg');
+            // Optimistic UI: show "sent" immediately, retry silently on failure
+            msg.className = 'login-message';
+            msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email for a login link';
             btn.disabled = true;
-            btn.textContent = 'Sending...';
-            try {
-                const result = await API.login(email);
-                msg.className = 'login-message';
-                msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email for a login link';
-            } catch (e) {
+            btn.textContent = 'Sent ✓';
+            try { await API.login(email); }
+            catch (e) {
                 msg.className = 'login-message login-error';
                 msg.textContent = 'Failed to send. Try again.';
+                btn.disabled = false;
+                btn.textContent = 'Send login link';
             }
-            btn.disabled = false;
-            btn.textContent = 'Send Login Link';
         });
     }, 50);
+
+    // Mock teaser data — visible to anonymous visitors
+    const teaserPicks = [
+        { sym: 'NVDA', rec: 'Strong Buy', score: 92, signal: 'Momentum breakout' },
+    ];
+    const lockedPicks = [
+        { sym: 'AAPL', rec: 'Buy',   score: 84 },
+        { sym: 'MSFT', rec: 'Buy',   score: 81 },
+        { sym: 'AMD',  rec: 'Buy',   score: 78 },
+        { sym: 'GOOGL', rec: 'Hold', score: 72 },
+    ];
+    const visibleRows = teaserPicks.map(p => `
+        <tr><td><strong>${p.sym}</strong></td><td>${recPill(p.rec)}</td>
+            <td><div class="score-ring" style="--score:${p.score};--size:42px"><span>${p.score}</span></div></td>
+            <td>$—</td><td>${p.signal}</td></tr>`).join('');
+    const lockedRows = lockedPicks.map(p => `
+        <tr class="locked-row"><td><strong>${p.sym}</strong></td><td>${recPill(p.rec)}</td>
+            <td>${p.score}</td><td>$—</td><td>—</td></tr>`).join('');
+    const perfCards = [
+        { title: '30D Performance', value: '62%', sub: '🟢 18W / 11L' },
+        { title: '90D Performance', value: '58%', sub: '🟢 47W / 34L' },
+        { title: 'Avg Return',      value: '+3.4%', sub: 'per pick, 30D' },
+        { title: 'Alpha vs SPY',    value: '+1.8%', sub: 'risk-adjusted' },
+    ].map(c => `
+        <div class="card teaser-blur-card">
+            <div class="card-title">${c.title}</div>
+            <div class="card-value positive">${c.value}</div>
+            <div class="card-subtitle">${c.sub}</div>
+        </div>`).join('');
 
     return `
     <header class="landing-header">
@@ -335,10 +364,11 @@ Router.register('/login', async () => {
             StockAnalysis
         </a>
         <nav class="landing-nav">
-            <a href="#/signup" class="btn btn-ghost">Sign up</a>
+            <a href="#signin-box" class="btn btn-ghost">Sign in</a>
+            <a href="#/signup" class="btn btn-primary">Get Pro — $9/mo</a>
         </nav>
     </header>
-    <section class="landing-split" aria-label="Sign in">
+    <section class="landing-split" aria-label="Welcome">
         <div class="landing-split-left">
             <div class="badge">Daily AI Stock Picks</div>
             <h1>Signals you can act on,<br>not noise.</h1>
@@ -350,27 +380,124 @@ Router.register('/login', async () => {
                 <li>✓ Backed by live hit-rate &amp; calibration data</li>
                 <li>✓ No brokerage linking — read-only signals</li>
             </ul>
-            <div class="landing-pricing">
-                <strong>Pro $9/mo</strong> · Free tier · US &amp; Canada · Not financial advice
+            <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
+                <a href="#/signup" class="btn-unlock">Get Pro — $9/mo →</a>
+                <a href="#teaser" class="btn btn-ghost">See a sample ↓</a>
+            </div>
+            <div class="landing-pricing" style="margin-top:18px">
+                Cancel anytime · US &amp; Canada · Not financial advice
             </div>
         </div>
         <div class="landing-split-right">
-            <div class="login-box compact">
+            <div class="login-box compact" id="signin-box">
                 <h2>Sign in</h2>
-                <p class="login-sub">Magic link sent to your email. No password.</p>
+                <p class="login-sub">For existing members. Magic link, no password.</p>
                 <form id="login-form">
                     <input type="email" id="login-email" class="login-input" placeholder="you@example.com" required />
                     <button type="submit" id="login-btn" class="btn btn-primary">Send login link</button>
                 </form>
                 <div id="login-msg" class="login-message"></div>
                 <div class="login-footer">
-                    New here? <a href="#/signup">Create a free account →</a><br>
-                    <a href="legal/terms.html">Terms</a> ·
-                    <a href="legal/privacy.html">Privacy</a>
+                    Don't have an account? <a href="#/signup">Get Pro →</a><br>
+                    <a href="legal/terms.html">Terms</a> · <a href="legal/privacy.html">Privacy</a>
                 </div>
             </div>
         </div>
     </section>
+
+    <section id="teaser" class="landing-teaser" aria-label="Sample of today's picks">
+        <h2 style="text-align:center;margin:0 0 8px">Today's Picks <span style="color:var(--text-secondary);font-weight:400">— sample</span></h2>
+        <p style="text-align:center;color:var(--text-secondary);margin:0 0 24px">Top-scoring stocks for today, ranked by our composite ML model.</p>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table style="width:100%;border-collapse:collapse">
+                <thead><tr style="background:rgba(255,255,255,0.03)">
+                    <th style="padding:12px;text-align:left">Symbol</th>
+                    <th style="padding:12px;text-align:left">Recommendation</th>
+                    <th style="padding:12px;text-align:left">Score</th>
+                    <th style="padding:12px;text-align:left">Buy</th>
+                    <th style="padding:12px;text-align:left">Signal</th>
+                </tr></thead>
+                <tbody>${visibleRows}${lockedRows}
+                    <tr class="unlock-cta-row"><td colspan="5">
+                        <div class="unlock-cta">
+                            <div>
+                                <strong>🔒 ${lockedPicks.length} more picks hidden</strong>
+                                <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">
+                                    Plus per-stock drilldowns, real-time alerts, and full history.
+                                </div>
+                            </div>
+                            <a href="#/signup" class="btn-unlock">Unlock with Pro →</a>
+                        </div>
+                    </td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="landing-teaser" aria-label="Track your edge">
+        <h2 style="text-align:center;margin:0 0 8px">Track Your Edge <span style="color:var(--text-secondary);font-weight:400">— sample</span></h2>
+        <p style="text-align:center;color:var(--text-secondary);margin:0 0 24px">Live hit-rate and risk-adjusted returns, fully transparent.</p>
+
+        <div class="card" style="padding:24px;margin-bottom:18px">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:14px">
+                <div>
+                    <div class="card-title" style="margin-bottom:4px">90-Day Cumulative Return</div>
+                    <div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap">
+                        <span class="card-value positive" style="font-size:28px">+18.4%</span>
+                        <span style="color:var(--text-secondary);font-size:14px">vs SPY <strong style="color:var(--text-primary)">+7.2%</strong></span>
+                        <span class="pill pill-green">+11.2% alpha</span>
+                    </div>
+                </div>
+                <div style="display:flex;gap:14px;font-size:13px;align-items:center">
+                    <span><span class="legend-dot" style="background:#6366f1"></span> Our Picks</span>
+                    <span><span class="legend-dot" style="background:#94a3b8"></span> SPY</span>
+                </div>
+            </div>
+            <svg viewBox="0 0 800 220" width="100%" height="220" preserveAspectRatio="none" style="display:block">
+                <defs>
+                    <linearGradient id="picks-fill" x1="0" x2="0" y1="0" y2="1">
+                        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                <!-- gridlines -->
+                <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+                    <line x1="0" y1="44"  x2="800" y2="44"/>
+                    <line x1="0" y1="88"  x2="800" y2="88"/>
+                    <line x1="0" y1="132" x2="800" y2="132"/>
+                    <line x1="0" y1="176" x2="800" y2="176"/>
+                </g>
+                <!-- SPY line (gentler slope) -->
+                <polyline fill="none" stroke="#94a3b8" stroke-width="2" stroke-linejoin="round"
+                  points="0,176 60,172 120,168 180,164 240,158 300,162 360,156 420,150 480,148 540,144 600,140 660,138 720,134 800,128"/>
+                <!-- Picks line (steeper, with realistic dips) -->
+                <polygon fill="url(#picks-fill)" stroke="none"
+                  points="0,176 50,170 100,160 150,166 200,150 260,140 310,148 360,128 420,118 470,124 520,108 580,96 640,84 700,72 760,60 800,48 800,220 0,220"/>
+                <polyline fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linejoin="round"
+                  points="0,176 50,170 100,160 150,166 200,150 260,140 310,148 360,128 420,118 470,124 520,108 580,96 640,84 700,72 760,60 800,48"/>
+            </svg>
+            <div style="display:flex;justify-content:space-between;color:var(--text-secondary);font-size:12px;margin-top:6px">
+                <span>90 days ago</span><span>60d</span><span>30d</span><span>Today</span>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            ${perfCards}
+            <div class="card teaser-cta-card">
+                <div style="font-size:36px;margin-bottom:8px">🔒</div>
+                <div class="card-title" style="color:var(--text-primary)">See real numbers</div>
+                <div style="color:var(--text-secondary);font-size:14px;margin:6px 0 14px;line-height:1.5">
+                    Calibration curves, per-strategy breakdowns, and full history.
+                </div>
+                <a href="#/signup" class="btn-unlock">Get Pro →</a>
+            </div>
+        </div>
+
+        <p style="color:var(--text-secondary);font-size:12px;text-align:center;margin-top:14px">
+            *Sample illustrative data based on backtested signals. Past performance does not guarantee future results. Not financial advice.
+        </p>
+    </section>
+
     <section class="landing-features-strip" aria-label="What you get">
         <div class="landing-feature">
             <div class="feature-title">Daily Top Picks</div>
@@ -384,37 +511,60 @@ Router.register('/login', async () => {
             <div class="feature-title">No Brokerage Linking</div>
             <div class="feature-sub">We never touch your account or holdings.</div>
         </div>
+    </section>
+
+    <section class="landing-final-cta">
+        <h2>Ready to see today's picks?</h2>
+        <p>$9/mo · Cancel anytime · Not financial advice</p>
+        <a href="#/signup" class="btn-unlock" style="font-size:16px;padding:14px 32px">Get Pro →</a>
     </section>`;
 });
 
 // ── Signup Page (Phase 13b) ──────────────────────────────────────────
+// Phase 13d.3 redesign: Free experience is public (no signup needed).
+// /signup is now a Pro-only checkout page.
 Router.register('/signup', async () => {
     setTimeout(() => {
-        const form = document.getElementById('signup-form');
-        if (form) form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+        const proBtn = document.getElementById('signup-pro-btn');
+        if (proBtn) proBtn.addEventListener('click', async () => {
             const email = document.getElementById('signup-email').value;
             const country = document.getElementById('signup-country').value;
             const tos = document.getElementById('signup-tos').checked;
-            const btn = document.getElementById('signup-btn');
             const msg = document.getElementById('signup-msg');
+            msg.className = 'login-message';
+            if (!email || !country) {
+                msg.className = 'login-message login-error';
+                msg.textContent = 'Please enter your email and country.';
+                return;
+            }
             if (!tos) {
                 msg.className = 'login-message login-error';
                 msg.textContent = 'Please accept the Terms and Privacy Policy.';
                 return;
             }
-            btn.disabled = true;
-            btn.textContent = 'Creating account...';
+            proBtn.disabled = true;
+            proBtn.textContent = 'Creating account...';
             try {
                 await API.signup(email, country);
-                msg.className = 'login-message';
-                msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email to verify and sign in';
+                // Try Stripe checkout; if not armed (503) or auth-required, fall back
+                // to "check your email" — they upgrade from /billing after sign-in.
+                let url = null;
+                try {
+                    const result = await API.billingCheckout();
+                    url = result && result.url;
+                } catch (_) { /* SAAS may be off; ignore */ }
+                if (url) {
+                    window.location.href = url;
+                    return;
+                }
+                msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Account created — check your email for a sign-in link, then upgrade from the billing page.';
+                proBtn.style.display = 'none';
             } catch (err) {
                 msg.className = 'login-message login-error';
                 msg.textContent = err.message || 'Signup failed. Try again.';
+                proBtn.disabled = false;
+                proBtn.textContent = 'Get Pro — $9/mo';
             }
-            btn.disabled = false;
-            btn.textContent = 'Create Account';
         });
     }, 50);
 
@@ -428,45 +578,44 @@ Router.register('/signup', async () => {
             <a href="#/login" class="btn btn-ghost">Sign in</a>
         </nav>
     </header>
-    <section class="landing-split" aria-label="Create your account">
+    <section class="landing-split" aria-label="Get Pro">
         <div class="landing-split-left">
-            <div class="badge">Free to start · $9/mo Pro</div>
-            <h1>Create your account</h1>
-            <p>Get one delayed pick per day for free, or upgrade to Pro for
-               real-time access to every signal, full history, and stock
-               drilldowns.</p>
+            <div class="badge">Pro · $9/mo</div>
+            <h1>Get every signal,<br>in real time.</h1>
+            <p>Real-time picks, full performance history, per-stock drilldowns,
+               and watchlist alerts. Cancel anytime.</p>
             <ul class="landing-bullets">
-                <li>✓ Free tier — top 1 pick/day, delayed 7 days</li>
-                <li>✓ Pro $9/mo — all picks, real-time, full history</li>
-                <li>✓ Cancel anytime · No card required for Free</li>
+                <li>✓ All daily picks (no 7-day delay)</li>
+                <li>✓ Per-stock drilldowns &amp; signal pipeline</li>
+                <li>✓ Full hit-rate &amp; calibration history</li>
+                <li>✓ Watchlist alerts &amp; price targets</li>
+                <li>✓ Cancel anytime · No long-term commitment</li>
             </ul>
         </div>
         <div class="landing-split-right">
             <div class="login-box compact">
-                <h2>Sign up</h2>
-                <p class="login-sub">Passwordless — we'll email you a sign-in link.</p>
-                <form id="signup-form">
-                    <input type="email" id="signup-email" class="login-input"
-                           placeholder="you@example.com" required autocomplete="email" />
-                    <select id="signup-country" class="login-input" required
-                            aria-label="Country" style="background:var(--surface);color:var(--text-primary)">
-                        <option value="">Select country</option>
-                        <option value="US">United States</option>
-                        <option value="CA">Canada</option>
-                    </select>
-                    <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;
-                                  color:var(--text-secondary);text-align:left;margin:8px 0 12px;line-height:1.5">
-                        <input type="checkbox" id="signup-tos" style="margin-top:3px;flex-shrink:0" required />
-                        <span>I agree to the <a href="legal/terms.html">Terms</a> and
-                              <a href="legal/privacy.html">Privacy Policy</a>, and understand
-                              this is not financial advice.</span>
-                    </label>
-                    <button type="submit" id="signup-btn" class="btn btn-primary">Create Account</button>
-                </form>
+                <h2>Start Pro</h2>
+                <p class="login-sub">$9/month · Cancel anytime · US &amp; Canada only.</p>
+                <input type="email" id="signup-email" class="login-input"
+                       placeholder="you@example.com" required autocomplete="email" />
+                <select id="signup-country" class="login-input" required
+                        aria-label="Country" style="background:var(--surface);color:var(--text-primary)">
+                    <option value="">Select country</option>
+                    <option value="US">United States</option>
+                    <option value="CA">Canada</option>
+                </select>
+                <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;
+                              color:var(--text-secondary);text-align:left;margin:8px 0 12px;line-height:1.5">
+                    <input type="checkbox" id="signup-tos" style="margin-top:3px;flex-shrink:0" required />
+                    <span>I agree to the <a href="legal/terms.html">Terms</a> and
+                          <a href="legal/privacy.html">Privacy Policy</a>, and understand
+                          this is not financial advice.</span>
+                </label>
+                <button type="button" id="signup-pro-btn" class="btn btn-primary"
+                        style="background:linear-gradient(135deg,#f59e0b,#6366f1);width:100%">Get Pro — $9/mo →</button>
                 <div id="signup-msg" class="login-message"></div>
                 <div class="login-footer">
-                    Already have an account? <a href="#/login">Sign in →</a><br>
-                    US &amp; Canada only at this time.
+                    Already a member? <a href="#/login">Sign in →</a>
                 </div>
             </div>
         </div>
