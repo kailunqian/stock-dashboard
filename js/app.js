@@ -1,5 +1,21 @@
 /* StockAnalysis Dashboard — SPA Router + Page Renderers */
 
+// ── Lazy Chart.js loader (only when /performance is visited) ────────
+let _chartJsPromise = null;
+function ensureChartJs() {
+    if (window.Chart) return Promise.resolve();
+    if (_chartJsPromise) return _chartJsPromise;
+    _chartJsPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+        s.async = true;
+        s.onload = () => resolve();
+        s.onerror = (e) => { _chartJsPromise = null; reject(e); };
+        document.head.appendChild(s);
+    });
+    return _chartJsPromise;
+}
+
 // ── Router ──────────────────────────────────────────────────────────
 
 const Router = {
@@ -12,7 +28,8 @@ const Router = {
         const hash = window.location.hash.slice(1) || '/login';
         const path = hash.split('?')[0];
 
-        // Auth check (skip for login)
+        // Auth check (skip for login). Memoized in API.checkAuth so navigation
+        // between routes within AUTH_TTL_MS doesn't burn an extra round-trip.
         if (path !== '/login') {
             const auth = await API.checkAuth();
             if (!auth.authenticated) {
@@ -40,12 +57,15 @@ const Router = {
                 _hydrateDag(main);
                 // Post-render: load performance charts if on performance page
                 if (path === '/performance') {
-                    loadPerformanceCharts(90);
+                    // Lazy-load Chart.js only when needed (saves ~84KB on every other page)
+                    ensureChartJs().then(() => loadPerformanceCharts(90));
                     // Wire up timeframe buttons via event delegation
                     const chartSection = document.getElementById('performance-charts');
                     if (chartSection) {
                         chartSection.querySelectorAll('.chart-timeframe button[data-days]').forEach(btn => {
-                            btn.addEventListener('click', () => loadPerformanceCharts(parseInt(btn.dataset.days)));
+                            btn.addEventListener('click', () => {
+                                ensureChartJs().then(() => loadPerformanceCharts(parseInt(btn.dataset.days)));
+                            });
                         });
                     }
                 }

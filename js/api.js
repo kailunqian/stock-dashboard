@@ -1,10 +1,27 @@
-/* API client for StockAnalysis Dashboard */
+/* API client for StockAnalysis Dashboard
+ *
+ * Performance design:
+ * - fetchWithCache: stale-while-revalidate via localStorage. First paint
+ *   uses last-known data instantly (typically <5ms), then a background
+ *   refetch updates the page if data changed. Server cache headers also
+ *   advertise SWR so the browser HTTP cache cooperates.
+ * - checkAuth: memoized for AUTH_TTL_MS so navigation between routes
+ *   doesn't burn an extra round-trip on every click.
+ */
 
 const API = {
-    base: 'https://func-stockanalysis-oksq5n.azurewebsites.net',  // Azure Functions API
+    base: 'https://func-stockanalysis-oksq5n.azurewebsites.net',
 
-    // Session management
     token: localStorage.getItem('session_token') || '',
+
+    // In-memory caches
+    _authCache: null,         // { result, expires }
+    _routeCache: {},          // path -> { data, ts }
+
+    // Cache TTLs
+    AUTH_TTL_MS: 30_000,      // re-check auth at most every 30s
+    SWR_FRESH_MS: 60_000,     // <60s old: serve cached, no refetch
+    SWR_STALE_MS: 5 * 60_000, // 60s-5min: serve cached + background refetch
 
     headers() {
         const h = { 'Content-Type': 'application/json' };
@@ -18,38 +35,89 @@ const API = {
             ...opts,
         });
         if (resp.status === 401) {
-            this.token = '';
-            localStorage.removeItem('session_token');
-            window.location.hash = '#/login';
+            this._handle401();
             return null;
         }
         return resp.json();
     },
 
-    async fetchWithCache(cachePath, livePath) {
-        // Try cache first (fast — served from blob, no cold start or DB queries)
+    _handle401() {
+        this.token = '';
+        this._authCache = null;
+        this._routeCache = {};
+        localStorage.removeItem('session_token');
+        window.location.hash = '#/login';
+    },
+
+    /* Stale-while-revalidate fetch:
+     * Returns a Promise that resolves to data ASAP — from localStorage if
+     * fresh, otherwise from network. When data is stale-but-usable we
+     * return it immediately and kick off a background refresh that calls
+     * onUpdate(freshData) when complete (so pages can re-render). */
+    async fetchWithCache(cachePath, livePath, onUpdate) {
+        const storeKey = `swr:${cachePath}`;
+        const cached = this._readSwrCache(storeKey);
+        const age = cached ? Date.now() - cached.ts : Infinity;
+
+        // Fresh: serve cache, skip network entirely
+        if (cached && age < this.SWR_FRESH_MS) {
+            return cached.data;
+        }
+
+        // Stale-but-usable: serve cache instantly, refresh in background
+        if (cached && age < this.SWR_STALE_MS) {
+            this._fetchFresh(cachePath, livePath, storeKey).then(fresh => {
+                if (fresh && onUpdate) onUpdate(fresh);
+            }).catch(() => {});
+            return cached.data;
+        }
+
+        // Cold or expired: must fetch network
+        return this._fetchFresh(cachePath, livePath, storeKey);
+    },
+
+    async _fetchFresh(cachePath, livePath, storeKey) {
+        // Try cache endpoint (blob-served, fast); fall back to live API
+        let data = null;
         try {
             const cacheRes = await fetch(`${this.base}/api/cache/${cachePath}`, {
                 headers: this.headers(),
             });
-            if (cacheRes.status === 401) {
-                this.token = '';
-                localStorage.removeItem('session_token');
-                window.location.hash = '#/login';
-                return null;
-            }
-            if (cacheRes.ok) {
-                return await cacheRes.json();
-            }
-        } catch (e) {
-            // Cache miss — fall through to live
-        }
+            if (cacheRes.status === 401) { this._handle401(); return null; }
+            if (cacheRes.ok) data = await cacheRes.json();
+        } catch (_) { /* fall through */ }
 
-        // Fall back to live API
-        return this.fetch(livePath);
+        if (!data) data = await this.fetch(livePath);
+
+        if (data) this._writeSwrCache(storeKey, data);
+        return data;
     },
 
-    // Auth
+    _readSwrCache(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            if (!obj || typeof obj.ts !== 'number') return null;
+            return obj;
+        } catch { return null; }
+    },
+
+    _writeSwrCache(key, data) {
+        try {
+            localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+        } catch {
+            // Quota — purge old SWR entries and retry once
+            try {
+                Object.keys(localStorage)
+                    .filter(k => k.startsWith('swr:'))
+                    .forEach(k => localStorage.removeItem(k));
+                localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data }));
+            } catch {}
+        }
+    },
+
+    // ── Auth ───────────────────────────────────────────────────────
     async login(email) {
         return fetch(`${this.base}/api/dashboard/auth/login`, {
             method: 'POST',
@@ -59,26 +127,39 @@ const API = {
     },
 
     async checkAuth() {
+        const now = Date.now();
+        if (this._authCache && this._authCache.expires > now) {
+            return this._authCache.result;
+        }
         try {
             const resp = await fetch(`${this.base}/api/dashboard/auth/me`, {
                 headers: this.headers(),
             });
-            if (resp.ok) return resp.json();
+            const result = resp.ok ? await resp.json() : { authenticated: false };
+            this._authCache = { result, expires: now + this.AUTH_TTL_MS };
+            return result;
+        } catch {
             return { authenticated: false };
-        } catch { return { authenticated: false }; }
+        }
     },
 
     async logout() {
-        await fetch(`${this.base}/api/dashboard/auth/logout`, {
-            method: 'POST', headers: this.headers(),
-        });
+        try {
+            await fetch(`${this.base}/api/dashboard/auth/logout`, {
+                method: 'POST', headers: this.headers(),
+            });
+        } catch {}
         this.token = '';
+        this._authCache = null;
+        this._routeCache = {};
+        // Clear SWR cache on logout so next user doesn't see stale data
+        Object.keys(localStorage).filter(k => k.startsWith('swr:')).forEach(k => localStorage.removeItem(k));
         localStorage.removeItem('session_token');
     },
 
-    // Data endpoints (cached where available)
-    daily()       { return this.fetchWithCache('daily', 'dashboard/daily'); },
-    performance() { return this.fetchWithCache('performance', 'dashboard/performance'); },
+    // ── Data endpoints (cached where available) ────────────────────
+    daily(onUpdate)       { return this.fetchWithCache('daily', 'dashboard/daily', onUpdate); },
+    performance(onUpdate) { return this.fetchWithCache('performance', 'dashboard/performance', onUpdate); },
     performanceHistory(days = 90) { return this.fetch(`dashboard/performance/history?days=${days}`); },
     stock(sym)    { return this.fetch(`dashboard/stock/${sym}`); },
     budget()      { return this.fetch('dashboard/budget'); },
