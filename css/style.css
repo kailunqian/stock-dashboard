@@ -1714,3 +1714,102 @@ kbd, .kbd {
   margin-top:20px;font-size:13px;color:var(--text-muted);
 }
 .landing-pricing strong{color:var(--text-primary);font-weight:600}
+
+
+/* === Landing v2 — split hero with above-the-fold sign-in (Phase 13d.2) === */
+.landing-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 32px;max-width:1200px;margin:0 auto;
+}
+.landing-brand{
+    display:inline-flex;align-items:center;gap:8px;
+    font-weight:700;font-size:16px;color:var(--text-primary);
+    text-decoration:none;letter-spacing:-0.01em;
+}
+.landing-brand svg{stroke:var(--accent);fill:none;stroke-width:2;
+    stroke-linecap:round;stroke-linejoin:round}
+.landing-nav{display:flex;gap:10px}
+.btn-ghost{
+    background:transparent;border:1px solid var(--border);
+    color:var(--text-primary);padding:8px 16px;border-radius:var(--radius);
+    font-size:14px;font-weight:600;text-decoration:none;
+    transition:all .15s ease;
+}
+.btn-ghost:hover{background:var(--surface);border-color:var(--accent)}
+
+.landing-split{
+    display:grid;grid-template-columns:1.1fr 1fr;gap:48px;
+    max-width:1200px;margin:24px auto 48px;padding:0 32px;
+    align-items:center;min-height:calc(100vh - 200px);
+}
+.landing-split-left .badge{
+    display:inline-block;padding:5px 12px;border-radius:999px;
+    background:rgba(120,160,255,0.14);color:var(--accent);
+    font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    margin-bottom:18px;
+}
+.landing-split-left h1{
+    font-size:clamp(32px,5vw,52px);line-height:1.05;font-weight:800;
+    letter-spacing:-0.02em;margin:0 0 18px;color:var(--text-primary);
+}
+.landing-split-left p{
+    font-size:17px;line-height:1.6;color:var(--text-secondary);
+    margin:0 0 24px;max-width:540px;
+}
+.landing-bullets{
+    list-style:none;padding:0;margin:0 0 24px;
+    display:flex;flex-direction:column;gap:10px;
+}
+.landing-bullets li{
+    font-size:15px;color:var(--text-primary);
+    padding-left:2px;
+}
+.landing-pricing{
+    font-size:13px;color:var(--text-secondary);
+    padding-top:18px;border-top:1px solid var(--border);
+}
+.landing-pricing strong{color:var(--text-primary)}
+
+.landing-split-right{display:flex;justify-content:center}
+.login-box.compact{
+    width:100%;max-width:420px;padding:32px 28px;
+    margin:0;
+}
+.login-box.compact h2{
+    font-size:24px;font-weight:700;margin:0 0 6px;
+    color:var(--text-primary);letter-spacing:-0.01em;
+}
+.login-box.compact .login-sub{
+    font-size:13px;color:var(--text-secondary);margin:0 0 20px;
+}
+
+.landing-features-strip{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:20px;
+    max-width:1200px;margin:0 auto 60px;padding:36px 32px;
+    border-top:1px solid var(--border);
+}
+.landing-features-strip .landing-feature{
+    padding:0;background:transparent;border:none;
+}
+.landing-features-strip .feature-title{
+    font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:6px;
+}
+.landing-features-strip .feature-sub{
+    font-size:13px;color:var(--text-secondary);line-height:1.5;
+}
+
+@media (max-width: 860px){
+    .landing-header{padding:14px 18px}
+    .landing-split{
+        grid-template-columns:1fr;gap:28px;min-height:0;
+        margin:8px auto 32px;padding:0 18px;
+    }
+    /* On mobile, put the form FIRST (above the marketing copy) so users
+       never have to scroll to sign in. */
+    .landing-split-right{order:-1}
+    .landing-split-left h1{font-size:30px}
+    .landing-split-left p{font-size:15px}
+    .landing-features-strip{
+        grid-template-columns:1fr;gap:18px;padding:24px 18px;margin-bottom:32px;
+    }
+}

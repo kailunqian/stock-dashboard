@@ -232,51 +232,62 @@ Router.register('/login', async () => {
     }, 50);
 
     return `
-    <section class="landing-hero" aria-label="What StockAnalysis does">
-        <div class="badge">Daily AI Stock Picks</div>
-        <h1>Signals you can act on, not noise.</h1>
-        <p>An ML pipeline scores 240+ stocks every market day across technicals,
-           fundamentals, news sentiment, and momentum — surfacing the few that
-           actually move. Built for self-directed investors.</p>
-        <div class="landing-features">
-            <div class="landing-feature">
-                <div class="feature-title">Daily Top Picks</div>
-                <div class="feature-sub">Tier-ranked actionable signals every trading day.</div>
-            </div>
-            <div class="landing-feature">
-                <div class="feature-title">Backed by Backtests</div>
-                <div class="feature-sub">Live hit-rate, calibration, and per-tier diagnostics — fully transparent.</div>
-            </div>
-            <div class="landing-feature">
-                <div class="feature-title">No Brokerage Linking</div>
-                <div class="feature-sub">We never touch your account or holdings.</div>
+    <header class="landing-header">
+        <a href="#/login" class="landing-brand">
+            <svg viewBox="0 0 24 24" width="20" height="20"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            StockAnalysis
+        </a>
+        <nav class="landing-nav">
+            <a href="#/signup" class="btn btn-ghost">Sign up</a>
+        </nav>
+    </header>
+    <section class="landing-split" aria-label="Sign in">
+        <div class="landing-split-left">
+            <div class="badge">Daily AI Stock Picks</div>
+            <h1>Signals you can act on,<br>not noise.</h1>
+            <p>An ML pipeline scores 240+ stocks every market day across
+               technicals, fundamentals, news sentiment, and momentum —
+               surfacing the few that actually move.</p>
+            <ul class="landing-bullets">
+                <li>✓ Daily top picks, ranked by composite score</li>
+                <li>✓ Backed by live hit-rate &amp; calibration data</li>
+                <li>✓ No brokerage linking — read-only signals</li>
+            </ul>
+            <div class="landing-pricing">
+                <strong>Pro $9/mo</strong> · Free tier · US &amp; Canada · Not financial advice
             </div>
         </div>
-        <div class="landing-pricing">
-            <strong>Pro $9/mo</strong> · Free tier available · US &amp; Canada only ·
-            Not financial advice
+        <div class="landing-split-right">
+            <div class="login-box compact">
+                <h2>Sign in</h2>
+                <p class="login-sub">Magic link sent to your email. No password.</p>
+                <form id="login-form">
+                    <input type="email" id="login-email" class="login-input" placeholder="you@example.com" required />
+                    <button type="submit" id="login-btn" class="btn btn-primary">Send login link</button>
+                </form>
+                <div id="login-msg" class="login-message"></div>
+                <div class="login-footer">
+                    New here? <a href="#/signup">Create a free account →</a><br>
+                    <a href="legal/terms.html">Terms</a> ·
+                    <a href="legal/privacy.html">Privacy</a>
+                </div>
+            </div>
         </div>
     </section>
-    <div class="login-container">
-        <div class="login-box">
-            <div class="login-logo">
-                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </div>
-            <h1>Sign in</h1>
-            <p>Magic link sent to your email. No password to remember.</p>
-            <form id="login-form">
-                <input type="email" id="login-email" class="login-input" placeholder="you@example.com" required />
-                <button type="submit" id="login-btn" class="btn btn-primary">Continue with Email</button>
-            </form>
-            <div id="login-msg" class="login-message"></div>
-            <div class="login-footer">
-                New here? <a href="#/signup">Create an account</a><br>
-                Secured with token-based authentication ·
-                <a href="legal/terms.html">Terms</a> ·
-                <a href="legal/privacy.html">Privacy</a>
-            </div>
+    <section class="landing-features-strip" aria-label="What you get">
+        <div class="landing-feature">
+            <div class="feature-title">Daily Top Picks</div>
+            <div class="feature-sub">Tier-ranked actionable signals every trading day.</div>
         </div>
-    </div>`;
+        <div class="landing-feature">
+            <div class="feature-title">Backed by Backtests</div>
+            <div class="feature-sub">Live hit-rate, calibration, per-tier diagnostics — fully transparent.</div>
+        </div>
+        <div class="landing-feature">
+            <div class="feature-title">No Brokerage Linking</div>
+            <div class="feature-sub">We never touch your account or holdings.</div>
+        </div>
+    </section>`;
 });
 
 // ── Signup Page (Phase 13b) ──────────────────────────────────────────
@@ -311,44 +322,58 @@ Router.register('/signup', async () => {
     }, 50);
 
     return `
-    <section class="landing-hero" aria-label="Create your account">
-        <div class="badge">Free to start · $9/mo Pro</div>
-        <h1>Create your account</h1>
-        <p>Get one delayed pick per day for free, or upgrade to Pro for real-time
-           access to every signal, full history, and stock drilldowns.</p>
-    </section>
-    <div class="login-container">
-        <div class="login-box">
-            <div class="login-logo">
-                <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-            </div>
-            <h1>Sign up</h1>
-            <p>Passwordless — we'll email you a sign-in link.</p>
-            <form id="signup-form">
-                <input type="email" id="signup-email" class="login-input"
-                       placeholder="you@example.com" required autocomplete="email" />
-                <select id="signup-country" class="login-input" required
-                        aria-label="Country" style="background:var(--surface);color:var(--text-primary)">
-                    <option value="">Select country</option>
-                    <option value="US">United States</option>
-                    <option value="CA">Canada</option>
-                </select>
-                <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;
-                              color:var(--text-secondary);text-align:left;margin:8px 0 12px;line-height:1.5">
-                    <input type="checkbox" id="signup-tos" style="margin-top:3px;flex-shrink:0" required />
-                    <span>I agree to the <a href="legal/terms.html">Terms</a> and
-                          <a href="legal/privacy.html">Privacy Policy</a>, and understand
-                          this is not financial advice.</span>
-                </label>
-                <button type="submit" id="signup-btn" class="btn btn-primary">Create Account</button>
-            </form>
-            <div id="signup-msg" class="login-message"></div>
-            <div class="login-footer">
-                Already have an account? <a href="#/login">Sign in</a><br>
-                US &amp; Canada only at this time.
+    <header class="landing-header">
+        <a href="#/login" class="landing-brand">
+            <svg viewBox="0 0 24 24" width="20" height="20"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            StockAnalysis
+        </a>
+        <nav class="landing-nav">
+            <a href="#/login" class="btn btn-ghost">Sign in</a>
+        </nav>
+    </header>
+    <section class="landing-split" aria-label="Create your account">
+        <div class="landing-split-left">
+            <div class="badge">Free to start · $9/mo Pro</div>
+            <h1>Create your account</h1>
+            <p>Get one delayed pick per day for free, or upgrade to Pro for
+               real-time access to every signal, full history, and stock
+               drilldowns.</p>
+            <ul class="landing-bullets">
+                <li>✓ Free tier — top 1 pick/day, delayed 24h</li>
+                <li>✓ Pro $9/mo — all picks, real-time, full history</li>
+                <li>✓ Cancel anytime · No card required for Free</li>
+            </ul>
+        </div>
+        <div class="landing-split-right">
+            <div class="login-box compact">
+                <h2>Sign up</h2>
+                <p class="login-sub">Passwordless — we'll email you a sign-in link.</p>
+                <form id="signup-form">
+                    <input type="email" id="signup-email" class="login-input"
+                           placeholder="you@example.com" required autocomplete="email" />
+                    <select id="signup-country" class="login-input" required
+                            aria-label="Country" style="background:var(--surface);color:var(--text-primary)">
+                        <option value="">Select country</option>
+                        <option value="US">United States</option>
+                        <option value="CA">Canada</option>
+                    </select>
+                    <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;
+                                  color:var(--text-secondary);text-align:left;margin:8px 0 12px;line-height:1.5">
+                        <input type="checkbox" id="signup-tos" style="margin-top:3px;flex-shrink:0" required />
+                        <span>I agree to the <a href="legal/terms.html">Terms</a> and
+                              <a href="legal/privacy.html">Privacy Policy</a>, and understand
+                              this is not financial advice.</span>
+                    </label>
+                    <button type="submit" id="signup-btn" class="btn btn-primary">Create Account</button>
+                </form>
+                <div id="signup-msg" class="login-message"></div>
+                <div class="login-footer">
+                    Already have an account? <a href="#/login">Sign in →</a><br>
+                    US &amp; Canada only at this time.
+                </div>
             </div>
         </div>
-    </div>`;
+    </section>`;
 });
 
 // ── Daily Report Page ───────────────────────────────────────────────
