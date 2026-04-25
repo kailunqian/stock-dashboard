@@ -436,7 +436,7 @@ Router.register('/signup', async () => {
                real-time access to every signal, full history, and stock
                drilldowns.</p>
             <ul class="landing-bullets">
-                <li>✓ Free tier — top 1 pick/day, delayed 24h</li>
+                <li>✓ Free tier — top 1 pick/day, delayed 7 days</li>
                 <li>✓ Pro $9/mo — all picks, real-time, full history</li>
                 <li>✓ Cancel anytime · No card required for Free</li>
             </ul>
@@ -498,8 +498,10 @@ Router.register('/daily', async () => {
     if (data.tier_gated && (!data.predictions || data.predictions.length === 0)
         && (!data.scan || !data.scan.top_picks || data.scan.top_picks.length === 0)) {
         const hrs = data.hours_until_unlock;
-        const reason = hrs != null
-            ? `Today's picks unlock for free users in <strong>${hrs} hours</strong>.`
+        const days = data.days_until_unlock != null ? data.days_until_unlock
+                   : (hrs != null ? Math.round(hrs / 24 * 10) / 10 : null);
+        const reason = days != null
+            ? `Today's picks unlock for free users in <strong>${days} day${days === 1 ? '' : 's'}</strong>.`
             : `Today's picks are Pro-only.`;
         return paywallCard(reason, data.upgrade_message, /*showStats*/ data);
     }
@@ -510,9 +512,10 @@ Router.register('/daily', async () => {
     const isLimited = !!data.tier_gated;
     const _shownCount = (data.predictions && data.predictions.length)
                      || (scan.top_picks && scan.top_picks.length) || 0;
+    const _delayDays = data.delay_days || 7;
     const limitedBanner = isLimited ? `
         <div class="glass" style="padding:14px 18px;margin-bottom:18px;border-color:rgba(255,180,80,0.3)">
-            <strong>Free tier:</strong> showing top ${_shownCount} pick (delayed 24h).
+            <strong>Free tier:</strong> showing top ${_shownCount} pick (delayed ${_delayDays} days).
             <a href="#/billing" style="margin-left:8px">Upgrade to Pro →</a>
         </div>` : '';
 
@@ -787,13 +790,42 @@ Router.register('/pipeline', async () => {
 Router.register('/performance', async () => {
     const data = await API.performance();
     if (!data) return '<p>Failed to load</p>';
-    // Phase 13d.3: Performance is Pro-only — blur teaser for Free impersonation
+    // Phase 13d.3: Performance is Pro-only — render realistic blurred cards
+    // with a single CTA card so it feels like a real dashboard with details
+    // hidden, not an abrupt full-page overlay.
     if (effectiveViewAsTier() === 'free') {
-        return blurredTeaser(
-            `<div class="card"><div class="card-title">30D Performance</div><div class="card-value positive">62%</div><div class="card-subtitle">🟢 Sample data</div></div>`,
-            'Performance analytics is Pro',
-            'See historical hit-rate, alpha vs SPY, calibration curves, and per-strategy breakdowns. Pro only.'
-        );
+        const fakeCards = [
+            { title: '30D Performance', value: '62%', sub: '🟢 18W / 11L (29 picks)', cls: 'positive' },
+            { title: '90D Performance', value: '58%', sub: '🟢 47W / 34L (81 picks)', cls: 'positive' },
+            { title: 'All-Time', value: '54%', sub: '🟢 142W / 121L (263 picks)', cls: 'positive' },
+            { title: 'Avg Return', value: '+3.4%', sub: 'per pick, 30D rolling', cls: 'positive' },
+            { title: 'Alpha vs SPY', value: '+1.8%', sub: 'risk-adjusted', cls: 'positive' },
+            { title: 'Sharpe Ratio', value: '1.42', sub: 'last 90 days', cls: 'positive' },
+        ];
+        const cardsHtml = fakeCards.map(c => `
+            <div class="card teaser-blur-card">
+                <div class="card-title">${c.title}</div>
+                <div class="card-value ${c.cls}">${c.value}</div>
+                <div class="card-subtitle">${c.sub}</div>
+            </div>`).join('');
+        return `
+        <h1 style="margin-bottom:18px">Performance</h1>
+        <div class="dashboard-grid">
+            ${cardsHtml}
+            <div class="card teaser-cta-card">
+                <div style="font-size:36px;margin-bottom:8px">🔒</div>
+                <div class="card-title" style="color:var(--text-primary)">Unlock Performance</div>
+                <div style="color:var(--text-secondary);font-size:14px;margin:6px 0 14px;line-height:1.5">
+                    See real hit-rate, alpha vs SPY, calibration curves, and per-strategy breakdowns.
+                </div>
+                <a href="#/billing" class="btn-unlock">Upgrade to Pro →</a>
+            </div>
+        </div>
+        <div class="card teaser-blur-card" style="margin-top:18px;min-height:220px">
+            <div class="card-title">Calibration Curve</div>
+            <div style="color:var(--text-secondary);font-size:13px">Predicted vs realized hit-rate by score bucket</div>
+            <div style="height:160px;background:linear-gradient(135deg, rgba(99,102,241,0.15), rgba(245,158,11,0.10));border-radius:8px;margin-top:12px"></div>
+        </div>`;
     }
 
     const sc = data.scorecard?.scorecards || {};
@@ -1573,7 +1605,7 @@ Router.register('/billing', async () => {
             <div class="card-subtitle">
                 ${isPro
                     ? 'Real-time picks, full history, charts, drilldowns, watchlist'
-                    : 'Top 1 pick/day · 24h delay · 7-day history'}
+                    : 'Top 1 pick/day · 7-day delay · 7-day history'}
             </div>
             <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
                 ${isPro
@@ -1585,7 +1617,7 @@ Router.register('/billing', async () => {
         <div class="card">
             <div class="card-title">What you get with Pro</div>
             <ul style="margin:8px 0 0;padding-left:20px;color:var(--text-secondary);font-size:14px;line-height:1.8">
-                <li>All daily picks, real-time (no 24h delay)</li>
+                <li>All daily picks, real-time (no 7-day delay)</li>
                 <li>Full performance &amp; calibration history</li>
                 <li>Per-stock drilldown + interactive charts</li>
                 <li>Unlimited watchlist</li>
