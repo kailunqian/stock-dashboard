@@ -69,6 +69,18 @@ const Router = {
             // Bottom-nav: visible on mobile only — controlled entirely by
             // CSS via `body.has-bottom-nav` + @media (max-width: 768px).
             document.body.classList.add('has-bottom-nav');
+            // Phase 13d.1: hide admin-only nav links from non-admins.
+            const isAdmin = !!auth.is_admin;
+            document.body.classList.toggle('is-admin', isAdmin);
+            document.querySelectorAll('[data-admin-only]').forEach(el => {
+                el.style.display = isAdmin ? '' : 'none';
+            });
+            // Block direct hash navigation to admin pages too.
+            const ADMIN_ROUTES = new Set(['/budget', '/system']);
+            if (!isAdmin && ADMIN_ROUTES.has(path)) {
+                window.location.hash = '#/daily';
+                return;
+            }
             // Phase 13e: legal disclaimer on every authenticated page,
             // dismissible per browser session (resets on tab close).
             const bar = document.getElementById('disclaimer-bar');
