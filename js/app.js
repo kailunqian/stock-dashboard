@@ -228,7 +228,15 @@ const Router = {
     }
 };
 
-window.addEventListener('hashchange', () => Router.handleRoute());
+window.addEventListener('hashchange', () => {
+    // In-page anchor (e.g. #teaser, #signin-box) — scroll, don't route.
+    const raw = window.location.hash.slice(1);
+    if (raw && !raw.startsWith('/')) {
+        const el = document.getElementById(raw);
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    }
+    Router.handleRoute();
+});
 
 // ── Helpers ─────────────────────────────────────────────────────────
 
