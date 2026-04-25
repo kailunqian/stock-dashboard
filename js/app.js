@@ -96,6 +96,11 @@ const Router = {
                         } else {
                             localStorage.setItem('viewAsTier', viewAsSel.value);
                         }
+                        // Phase 13d.3: nuke all SWR caches so we don't bleed
+                        // payloads across tiers (admin → free → admin etc).
+                        Object.keys(localStorage)
+                            .filter(k => k.startsWith('swr:'))
+                            .forEach(k => localStorage.removeItem(k));
                     } catch (_) {}
                     // Hard reload to flush any cached tier-gated UI.
                     window.location.reload();

@@ -61,7 +61,12 @@ const API = {
      * return it immediately and kick off a background refresh that calls
      * onUpdate(freshData) when complete (so pages can re-render). */
     async fetchWithCache(cachePath, livePath, onUpdate) {
-        const storeKey = `swr:${cachePath}`;
+        // Phase 13d.3: cache key includes view-as tier so admin switching
+        // between Admin/Free/Pro doesn't see stale cross-tier payloads.
+        let viewAs = '';
+        try { viewAs = localStorage.getItem('viewAsTier') || ''; } catch(_){}
+        const tierSuffix = viewAs && viewAs !== 'real' ? `:as=${viewAs}` : '';
+        const storeKey = `swr:${cachePath}${tierSuffix}`;
         const cached = this._readSwrCache(storeKey);
         const age = cached ? Date.now() - cached.ts : Infinity;
 
