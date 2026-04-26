@@ -1802,21 +1802,19 @@ Router.register('/admin', async () => {
             const msg = document.getElementById('coadmin-msg');
             const email = (inp.value || '').trim();
             if (!email || !email.includes('@')) {
-                msg.textContent = 'Enter a valid email.';
+                msg.textContent = '⚠ Enter a valid email.';
                 msg.style.color = '#e57373';
                 return;
             }
             addBtn.disabled = true;
+            msg.textContent = 'Adding…'; msg.style.color = '';
             try {
                 await API.addCoAdmin(email);
-                inp.value = '';
-                msg.textContent = `Added ${email}.`;
-                msg.style.color = '';
+                alert(`✅ Added ${email} as co-admin.`);
                 Router.handleRoute();
             } catch (e) {
-                msg.textContent = e.message || 'Failed to add';
+                msg.textContent = `❌ ${e.message || 'Failed to add'}`;
                 msg.style.color = '#e57373';
-            } finally {
                 addBtn.disabled = false;
             }
         });
@@ -1829,34 +1827,32 @@ Router.register('/admin', async () => {
                     await API.removeCoAdmin(email);
                     Router.handleRoute();
                 } catch (e) {
-                    alert(e.message || 'Failed to remove');
+                    alert(`❌ ${e.message || 'Failed to remove'}`);
                     b.disabled = false;
                 }
             });
         });
 
-        // Phase 13d.3: Grant-Pro form
+        // Phase 13d.3: beta-tester form
         const grantBtn = document.getElementById('beta-add-btn');
         if (grantBtn) grantBtn.addEventListener('click', async () => {
             const inp = document.getElementById('beta-email');
             const msg = document.getElementById('beta-msg');
             const email = (inp.value || '').trim();
             if (!email || !email.includes('@')) {
-                msg.textContent = 'Enter a valid email.';
+                msg.textContent = '⚠ Enter a valid email.';
                 msg.style.color = '#e57373';
                 return;
             }
             grantBtn.disabled = true;
+            msg.textContent = 'Adding…'; msg.style.color = '';
             try {
                 await API.addBetaTester(email);
-                inp.value = '';
-                msg.textContent = `Added beta tester ${email}.`;
-                msg.style.color = '';
+                alert(`✅ Added ${email} as beta tester.`);
                 Router.handleRoute();
             } catch (e) {
-                msg.textContent = e.message || 'Failed to add';
+                msg.textContent = `❌ ${e.message || 'Failed to add'}`;
                 msg.style.color = '#e57373';
-            } finally {
                 grantBtn.disabled = false;
             }
         });
@@ -1869,13 +1865,12 @@ Router.register('/admin', async () => {
                     await API.removeBetaTester(email);
                     Router.handleRoute();
                 } catch (e) {
-                    alert(e.message || 'Failed to remove');
+                    alert(`❌ ${e.message || 'Failed to remove'}`);
                     b.disabled = false;
                 }
             });
         });
     };
-    setTimeout(wireUp, 50);
 
     let coAdmins = [];
     let betaTesters = [];
@@ -1885,7 +1880,12 @@ Router.register('/admin', async () => {
     } catch (e) {
         loadError = e.message;
     }
-    try { betaTesters = await API.listBetaTesters(); } catch (_) {}
+    let betaError = null;
+    try { betaTesters = await API.listBetaTesters(); } catch (e) { betaError = e.message; }
+
+    // Wire up AFTER router swaps innerHTML (this fn returns, router sets HTML).
+    // requestAnimationFrame fires on the next paint, after innerHTML is in DOM.
+    requestAnimationFrame(() => requestAnimationFrame(wireUp));
 
     const rows = coAdmins.length === 0
         ? `<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:24px">
@@ -1942,6 +1942,9 @@ Router.register('/admin', async () => {
     </div>
 
     <div class="page-eyebrow" style="margin-top:32px">Beta Testers · Manual Pro Access</div>
+    ${betaError ? `<div class="glass" style="margin:12px 0;border-color:rgba(229,115,115,0.3);padding:12px 16px">
+        ❌ ${betaError}
+    </div>` : ''}
     <div class="card">
         <div class="card-title">About beta testers</div>
         <div style="color:var(--text-secondary);font-size:14px;line-height:1.7;margin-top:8px">
