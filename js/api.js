@@ -129,12 +129,18 @@ const API = {
     },
 
     // ── Auth ───────────────────────────────────────────────────────
+    // Unified sign-in / create-account (Phase 13e): /api/auth/signup is
+    // idempotent — creates a free user row if missing, sends a magic link
+    // either way. Replaces legacy /api/dashboard/auth/login (allowlist-only).
     async login(email) {
-        return fetch(`${this.base}/api/dashboard/auth/login`, {
+        const resp = await fetch(`${this.base}/api/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
-        }).then(r => r.json());
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to send sign-in link');
+        return body;
     },
 
     // Phase 13b SaaS: public signup. Returns the same {ok, message} shape

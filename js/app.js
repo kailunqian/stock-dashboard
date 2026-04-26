@@ -341,7 +341,7 @@ Router.register('/login', async () => {
             const msg = document.getElementById('login-msg');
             // Optimistic UI: show "sent" immediately, retry silently on failure
             msg.className = 'login-message';
-            msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email for a login link';
+            msg.innerHTML = '<svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg> Check your email for a sign-in link';
             btn.disabled = true;
             btn.textContent = 'Sent ✓';
             try { await API.login(email); }
@@ -349,7 +349,7 @@ Router.register('/login', async () => {
                 msg.className = 'login-message login-error';
                 msg.textContent = 'Failed to send. Try again.';
                 btn.disabled = false;
-                btn.textContent = 'Send login link';
+                btn.textContent = 'Send sign-in link';
             }
         });
     }, 50);
@@ -416,15 +416,15 @@ Router.register('/login', async () => {
         </div>
         <div class="landing-split-right">
             <div class="login-box compact" id="signin-box">
-                <h2>Sign in</h2>
-                <p class="login-sub">For existing members. Magic link, no password.</p>
+                <h2>Sign in or get started — free</h2>
+                <p class="login-sub">Enter your email — we'll send a link. Account is created automatically if you're new.</p>
                 <form id="login-form">
                     <input type="email" id="login-email" class="login-input" placeholder="you@example.com" required />
-                    <button type="submit" id="login-btn" class="btn btn-primary">Send login link</button>
+                    <button type="submit" id="login-btn" class="btn btn-primary">Send sign-in link</button>
                 </form>
                 <div id="login-msg" class="login-message"></div>
                 <div class="login-footer">
-                    Don't have an account? ${proCta('Get Pro →', { className: '' })}<br>
+                    Want full access? ${proCta('Upgrade to Pro →', { className: '' })}<br>
                     <a href="legal/terms.html">Terms</a> · <a href="legal/privacy.html">Privacy</a>
                 </div>
             </div>
