@@ -144,7 +144,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/auth/signup`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ email, country }),
         });
         const body = await resp.json().catch(() => ({}));
@@ -156,7 +155,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/auth/magic-link`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
@@ -169,7 +167,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/billing/checkout`, {
             method: 'POST',
             headers: this.headers(),
-            credentials: 'include',
         });
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(body.error || 'Could not start checkout');
@@ -179,7 +176,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/billing/portal`, {
             method: 'POST',
             headers: this.headers(),
-            credentials: 'include',
         });
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(body.error || 'Could not open portal');
@@ -189,7 +185,7 @@ const API = {
     // Phase 13d.2: super-admin manages co-admins
     async listCoAdmins() {
         const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
-            headers: this.headers(), credentials: 'include',
+            headers: this.headers(),
         });
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(body.error || 'Failed to load');
@@ -199,7 +195,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
@@ -210,7 +205,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
@@ -221,7 +215,7 @@ const API = {
     // Phase 13d.3: beta testers (manual Pro access without Stripe)
     async listBetaTesters() {
         const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
-            headers: this.headers(), credentials: 'include',
+            headers: this.headers(),
         });
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(body.error || 'Failed to load');
@@ -231,7 +225,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
@@ -242,7 +235,6 @@ const API = {
         const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
-            credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
