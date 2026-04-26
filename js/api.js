@@ -218,6 +218,38 @@ const API = {
         return body;
     },
 
+    // Phase 13d.3: manually grant Pro (super-admin only)
+    async listGrantedPro() {
+        const resp = await fetch(`${this.base}/api/admin/grant-pro`, {
+            headers: this.headers(), credentials: 'include',
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to load');
+        return body.granted || [];
+    },
+    async grantPro(email) {
+        const resp = await fetch(`${this.base}/api/admin/grant-pro`, {
+            method: 'POST',
+            headers: { ...this.headers(), 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to grant');
+        return body;
+    },
+    async revokePro(email) {
+        const resp = await fetch(`${this.base}/api/admin/grant-pro`, {
+            method: 'DELETE',
+            headers: { ...this.headers(), 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ email }),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Failed to revoke');
+        return body;
+    },
+
     async checkAuth() {
         const now = Date.now();
         if (this._authCache && this._authCache.expires > now) {

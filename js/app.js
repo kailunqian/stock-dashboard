@@ -1834,16 +1834,58 @@ Router.register('/admin', async () => {
                 }
             });
         });
+
+        // Phase 13d.3: Grant-Pro form
+        const grantBtn = document.getElementById('grantpro-add-btn');
+        if (grantBtn) grantBtn.addEventListener('click', async () => {
+            const inp = document.getElementById('grantpro-email');
+            const msg = document.getElementById('grantpro-msg');
+            const email = (inp.value || '').trim();
+            if (!email || !email.includes('@')) {
+                msg.textContent = 'Enter a valid email.';
+                msg.style.color = '#e57373';
+                return;
+            }
+            grantBtn.disabled = true;
+            try {
+                await API.grantPro(email);
+                inp.value = '';
+                msg.textContent = `Granted Pro to ${email}.`;
+                msg.style.color = '';
+                Router.handleRoute();
+            } catch (e) {
+                msg.textContent = e.message || 'Failed to grant';
+                msg.style.color = '#e57373';
+            } finally {
+                grantBtn.disabled = false;
+            }
+        });
+        document.querySelectorAll('[data-grantpro-revoke]').forEach(b => {
+            b.addEventListener('click', async () => {
+                const email = b.getAttribute('data-grantpro-revoke');
+                if (!confirm(`Revoke Pro access for ${email}?`)) return;
+                b.disabled = true;
+                try {
+                    await API.revokePro(email);
+                    Router.handleRoute();
+                } catch (e) {
+                    alert(e.message || 'Failed to revoke');
+                    b.disabled = false;
+                }
+            });
+        });
     };
     setTimeout(wireUp, 50);
 
     let coAdmins = [];
+    let grantedPro = [];
     let loadError = null;
     try {
         coAdmins = await API.listCoAdmins();
     } catch (e) {
         loadError = e.message;
     }
+    try { grantedPro = await API.listGrantedPro(); } catch (_) {}
 
     const rows = coAdmins.length === 0
         ? `<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:24px">
@@ -1897,6 +1939,49 @@ Router.register('/admin', async () => {
             <button id="coadmin-add-btn" class="btn btn-primary">Promote to co-admin</button>
         </div>
         <div id="coadmin-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
+    </div>
+
+    <div class="page-eyebrow" style="margin-top:32px">Pro Access · Manual Grants</div>
+    <div class="card">
+        <div class="card-title">About manual Pro grants</div>
+        <div style="color:var(--text-secondary);font-size:14px;line-height:1.7;margin-top:8px">
+            Grant <strong>Pro tier</strong> to a user without going through Stripe — useful for
+            comp accounts, beta testers, or out-of-band paid users. Granted users get full
+            feature access (real-time picks, drilldowns, history) but <em>not</em> admin
+            permissions. Stripe-paying customers cannot be revoked here — manage them via
+            the Stripe portal.
+        </div>
+    </div>
+
+    <div class="table-container" style="margin-top:18px">
+        <div class="table-header">
+            Manually-Granted Pro <span class="pill pill-blue" style="margin-left:auto">${grantedPro.length}</span>
+        </div>
+        <table>
+            <thead><tr><th>Email</th><th>Plan tier</th><th style="text-align:right">Action</th></tr></thead>
+            <tbody>${grantedPro.length === 0
+                ? `<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:24px">
+                       No manual Pro grants yet.</td></tr>`
+                : grantedPro.map(u => `
+                    <tr>
+                        <td><strong>${u.email}</strong></td>
+                        <td><span class="pill pill-green">${u.plan_tier}</span></td>
+                        <td style="text-align:right">
+                            <button class="btn btn-ghost" data-grantpro-revoke="${u.email}">Revoke</button>
+                        </td>
+                    </tr>`).join('')}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card" style="margin-top:18px">
+        <div class="card-title">Grant Pro</div>
+        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <input id="grantpro-email" type="email" placeholder="email@example.com"
+                   class="login-input" style="flex:1;min-width:240px;margin:0" />
+            <button id="grantpro-add-btn" class="btn btn-primary">Grant Pro access</button>
+        </div>
+        <div id="grantpro-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
     </div>
     `;
 });
