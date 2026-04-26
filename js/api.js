@@ -218,35 +218,35 @@ const API = {
         return body;
     },
 
-    // Phase 13d.3: manually grant Pro (super-admin only)
-    async listGrantedPro() {
-        const resp = await fetch(`${this.base}/api/admin/grant-pro`, {
+    // Phase 13d.3: beta testers (manual Pro access without Stripe)
+    async listBetaTesters() {
+        const resp = await fetch(`${this.base}/api/admin/beta-testers`, {
             headers: this.headers(), credentials: 'include',
         });
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok) throw new Error(body.error || 'Failed to load');
-        return body.granted || [];
+        return body.beta_testers || [];
     },
-    async grantPro(email) {
-        const resp = await fetch(`${this.base}/api/admin/grant-pro`, {
+    async addBetaTester(email) {
+        const resp = await fetch(`${this.base}/api/admin/beta-testers`, {
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(body.error || 'Failed to grant');
+        if (!resp.ok) throw new Error(body.error || 'Failed to add');
         return body;
     },
-    async revokePro(email) {
-        const resp = await fetch(`${this.base}/api/admin/grant-pro`, {
+    async removeBetaTester(email) {
+        const resp = await fetch(`${this.base}/api/admin/beta-testers`, {
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             credentials: 'include',
             body: JSON.stringify({ email }),
         });
         const body = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(body.error || 'Failed to revoke');
+        if (!resp.ok) throw new Error(body.error || 'Failed to remove');
         return body;
     },
 

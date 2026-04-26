@@ -1836,10 +1836,10 @@ Router.register('/admin', async () => {
         });
 
         // Phase 13d.3: Grant-Pro form
-        const grantBtn = document.getElementById('grantpro-add-btn');
+        const grantBtn = document.getElementById('beta-add-btn');
         if (grantBtn) grantBtn.addEventListener('click', async () => {
-            const inp = document.getElementById('grantpro-email');
-            const msg = document.getElementById('grantpro-msg');
+            const inp = document.getElementById('beta-email');
+            const msg = document.getElementById('beta-msg');
             const email = (inp.value || '').trim();
             if (!email || !email.includes('@')) {
                 msg.textContent = 'Enter a valid email.';
@@ -1848,28 +1848,28 @@ Router.register('/admin', async () => {
             }
             grantBtn.disabled = true;
             try {
-                await API.grantPro(email);
+                await API.addBetaTester(email);
                 inp.value = '';
-                msg.textContent = `Granted Pro to ${email}.`;
+                msg.textContent = `Added beta tester ${email}.`;
                 msg.style.color = '';
                 Router.handleRoute();
             } catch (e) {
-                msg.textContent = e.message || 'Failed to grant';
+                msg.textContent = e.message || 'Failed to add';
                 msg.style.color = '#e57373';
             } finally {
                 grantBtn.disabled = false;
             }
         });
-        document.querySelectorAll('[data-grantpro-revoke]').forEach(b => {
+        document.querySelectorAll('[data-beta-remove]').forEach(b => {
             b.addEventListener('click', async () => {
-                const email = b.getAttribute('data-grantpro-revoke');
-                if (!confirm(`Revoke Pro access for ${email}?`)) return;
+                const email = b.getAttribute('data-beta-remove');
+                if (!confirm(`Remove beta tester ${email}?`)) return;
                 b.disabled = true;
                 try {
-                    await API.revokePro(email);
+                    await API.removeBetaTester(email);
                     Router.handleRoute();
                 } catch (e) {
-                    alert(e.message || 'Failed to revoke');
+                    alert(e.message || 'Failed to remove');
                     b.disabled = false;
                 }
             });
@@ -1878,14 +1878,14 @@ Router.register('/admin', async () => {
     setTimeout(wireUp, 50);
 
     let coAdmins = [];
-    let grantedPro = [];
+    let betaTesters = [];
     let loadError = null;
     try {
         coAdmins = await API.listCoAdmins();
     } catch (e) {
         loadError = e.message;
     }
-    try { grantedPro = await API.listGrantedPro(); } catch (_) {}
+    try { betaTesters = await API.listBetaTesters(); } catch (_) {}
 
     const rows = coAdmins.length === 0
         ? `<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:24px">
@@ -1941,33 +1941,33 @@ Router.register('/admin', async () => {
         <div id="coadmin-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
     </div>
 
-    <div class="page-eyebrow" style="margin-top:32px">Pro Access · Manual Grants</div>
+    <div class="page-eyebrow" style="margin-top:32px">Beta Testers · Manual Pro Access</div>
     <div class="card">
-        <div class="card-title">About manual Pro grants</div>
+        <div class="card-title">About beta testers</div>
         <div style="color:var(--text-secondary);font-size:14px;line-height:1.7;margin-top:8px">
-            Grant <strong>Pro tier</strong> to a user without going through Stripe — useful for
-            comp accounts, beta testers, or out-of-band paid users. Granted users get full
-            feature access (real-time picks, drilldowns, history) but <em>not</em> admin
-            permissions. Stripe-paying customers cannot be revoked here — manage them via
-            the Stripe portal.
+            Beta testers see exactly what <strong>Pro paying users</strong> see — useful for
+            testing the paid experience, comp accounts, and early-access invites. They get
+            full feature access (real-time picks, drilldowns, history) but <em>not</em>
+            admin permissions. Stripe-paying customers cannot be removed here — manage them
+            via the Stripe portal.
         </div>
     </div>
 
     <div class="table-container" style="margin-top:18px">
         <div class="table-header">
-            Manually-Granted Pro <span class="pill pill-blue" style="margin-left:auto">${grantedPro.length}</span>
+            Beta Testers <span class="pill pill-blue" style="margin-left:auto">${betaTesters.length}</span>
         </div>
         <table>
             <thead><tr><th>Email</th><th>Plan tier</th><th style="text-align:right">Action</th></tr></thead>
-            <tbody>${grantedPro.length === 0
+            <tbody>${betaTesters.length === 0
                 ? `<tr><td colspan="3" style="text-align:center;color:var(--text-secondary);padding:24px">
-                       No manual Pro grants yet.</td></tr>`
-                : grantedPro.map(u => `
+                       No beta testers yet.</td></tr>`
+                : betaTesters.map(u => `
                     <tr>
                         <td><strong>${u.email}</strong></td>
                         <td><span class="pill pill-green">${u.plan_tier}</span></td>
                         <td style="text-align:right">
-                            <button class="btn btn-ghost" data-grantpro-revoke="${u.email}">Revoke</button>
+                            <button class="btn btn-ghost" data-beta-remove="${u.email}">Remove</button>
                         </td>
                     </tr>`).join('')}
             </tbody>
@@ -1975,13 +1975,13 @@ Router.register('/admin', async () => {
     </div>
 
     <div class="card" style="margin-top:18px">
-        <div class="card-title">Grant Pro</div>
+        <div class="card-title">Add beta tester</div>
         <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-            <input id="grantpro-email" type="email" placeholder="email@example.com"
+            <input id="beta-email" type="email" placeholder="email@example.com"
                    class="login-input" style="flex:1;min-width:240px;margin:0" />
-            <button id="grantpro-add-btn" class="btn btn-primary">Grant Pro access</button>
+            <button id="beta-add-btn" class="btn btn-primary">Add as beta tester</button>
         </div>
-        <div id="grantpro-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
+        <div id="beta-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
     </div>
     `;
 });
