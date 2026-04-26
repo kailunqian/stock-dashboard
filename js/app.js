@@ -1,5 +1,25 @@
 /* StockAnalysis Dashboard — SPA Router + Page Renderers */
 
+// Phase 13e: Stripe arming flag. Flip to true once STRIPE_SECRET_KEY,
+// STRIPE_PRICE_ID, STRIPE_WEBHOOK_SECRET are set in Azure Function App
+// settings AND a smoke checkout has been verified. While false, all
+// "Get Pro / Upgrade / Unlock" CTAs render as a non-clickable
+// "Pro · coming soon" pill so users never hit a 503 from /api/billing.
+const STRIPE_ENABLED = false;
+
+function proCta(label, opts) {
+    opts = opts || {};
+    const cls = opts.className || 'btn-unlock';
+    const style = opts.style || '';
+    if (STRIPE_ENABLED) {
+        return `<a href="#/signup" class="${cls}" style="${style}">${label}</a>`;
+    }
+    // Disabled state: same visual weight, no link, "coming soon" hint.
+    return `<span class="${cls}" style="${style};opacity:0.6;cursor:not-allowed;pointer-events:none" title="Pro launches soon — drop your email below to get notified">
+        🔒 Pro · coming soon
+    </span>`;
+}
+
 // ── Phase 13d: Paywall card (shared) ────────────────────────────────
 function effectiveViewAsTier() {
     try { return localStorage.getItem('viewAsTier') || 'real'; } catch (_) { return 'real'; }
@@ -15,9 +35,7 @@ function blurredTeaser(innerHtml, title, subtitle) {
                 <p style="color:var(--text-secondary);margin:0 0 18px;max-width:420px">
                     ${subtitle || 'Upgrade to Pro to unlock the full experience — daily picks, per-stock drilldowns, performance analytics, and real-time alerts.'}
                 </p>
-                <a href="#/billing" class="btn-primary" style="display:inline-block;background:linear-gradient(135deg,#f59e0b,#6366f1);color:#fff;padding:12px 24px;border-radius:8px;font-weight:600;text-decoration:none">
-                    Unlock with Pro →
-                </a>
+                    ${proCta('Unlock with Pro →', { className: 'btn-primary', style: 'display:inline-block;background:linear-gradient(135deg,#f59e0b,#6366f1);color:#fff;padding:12px 24px;border-radius:8px;font-weight:600;text-decoration:none' })}
             </div>
         </div>
     </div>`;
@@ -42,7 +60,7 @@ function paywallCard(reasonHtml, message, statsObj) {
         <div style="color:var(--text-secondary);max-width:520px;margin:0 auto 18px;font-size:14px">
             ${message || 'Upgrade to Pro for full access — $9/mo.'}
         </div>
-        <a href="#/billing" class="btn btn-primary">Upgrade to Pro — $9/mo</a>
+        ${proCta('Upgrade to Pro — $9/mo', { className: 'btn btn-primary' })}
         ${metaRow}
     </div>`;
 }
@@ -373,7 +391,7 @@ Router.register('/login', async () => {
         </a>
         <nav class="landing-nav">
             <a href="#signin-box" class="btn btn-ghost">Sign in</a>
-            <a href="#/signup" class="btn btn-primary">Get Pro — $9/mo</a>
+            ${proCta('Get Pro — $9/mo', { className: 'btn btn-primary', style: 'width:auto;padding:8px 16px' })}
         </nav>
     </header>
     <section class="landing-split" aria-label="Welcome">
@@ -389,7 +407,7 @@ Router.register('/login', async () => {
                 <li>✓ No brokerage linking — read-only signals</li>
             </ul>
             <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
-                <a href="#/signup" class="btn-unlock">Get Pro — $9/mo →</a>
+                ${proCta('Get Pro — $9/mo →')}
                 <a href="#teaser" class="btn btn-ghost">See a sample ↓</a>
             </div>
             <div class="landing-pricing" style="margin-top:18px">
@@ -406,7 +424,7 @@ Router.register('/login', async () => {
                 </form>
                 <div id="login-msg" class="login-message"></div>
                 <div class="login-footer">
-                    Don't have an account? <a href="#/signup">Get Pro →</a><br>
+                    Don't have an account? ${proCta('Get Pro →', { className: '' })}<br>
                     <a href="legal/terms.html">Terms</a> · <a href="legal/privacy.html">Privacy</a>
                 </div>
             </div>
@@ -434,7 +452,7 @@ Router.register('/login', async () => {
                                     Plus per-stock drilldowns, real-time alerts, and full history.
                                 </div>
                             </div>
-                            <a href="#/signup" class="btn-unlock">Unlock with Pro →</a>
+                            ${proCta('Unlock with Pro →')}
                         </div>
                     </td></tr>
                 </tbody>
@@ -497,7 +515,7 @@ Router.register('/login', async () => {
                 <div style="color:var(--text-secondary);font-size:14px;margin:6px 0 14px;line-height:1.5">
                     Calibration curves, per-strategy breakdowns, and full history.
                 </div>
-                <a href="#/signup" class="btn-unlock">Get Pro →</a>
+                ${proCta('Get Pro →')}
             </div>
         </div>
 
@@ -524,7 +542,7 @@ Router.register('/login', async () => {
     <section class="landing-final-cta">
         <h2>Ready to see today's picks?</h2>
         <p>$9/mo · Cancel anytime · Not financial advice</p>
-        <a href="#/signup" class="btn-unlock" style="font-size:16px;padding:14px 32px">Get Pro →</a>
+        ${proCta('Get Pro →', { style: 'font-size:16px;padding:14px 32px' })}
     </section>`;
 });
 
@@ -571,7 +589,7 @@ Router.register('/signup', async () => {
                 msg.className = 'login-message login-error';
                 msg.textContent = err.message || 'Signup failed. Try again.';
                 proBtn.disabled = false;
-                proBtn.textContent = 'Get Pro — $9/mo';
+                proBtn.textContent = STRIPE_ENABLED ? 'Get Pro — $9/mo' : 'Join the Pro waitlist';
             }
         });
     }, 50);
@@ -620,7 +638,7 @@ Router.register('/signup', async () => {
                           this is not financial advice.</span>
                 </label>
                 <button type="button" id="signup-pro-btn" class="btn btn-primary"
-                        style="background:linear-gradient(135deg,#f59e0b,#6366f1);width:100%">Get Pro — $9/mo →</button>
+                        style="background:linear-gradient(135deg,#f59e0b,#6366f1);width:100%">${STRIPE_ENABLED ? 'Get Pro — $9/mo →' : 'Join the Pro waitlist →'}</button>
                 <div id="signup-msg" class="login-message"></div>
                 <div class="login-footer">
                     Already a member? <a href="#/login">Sign in →</a>
@@ -739,7 +757,7 @@ Router.register('/daily', async () => {
                                 Unlock all daily picks, per-stock drilldowns, and real-time alerts with Pro.
                             </div>
                         </div>
-                        <a href="#/billing" class="btn-primary">Unlock with Pro →</a>
+                        ${proCta('Unlock with Pro →', { className: 'btn-primary' })}
                     </div>
                 </td></tr>`;
         }
@@ -1766,7 +1784,9 @@ Router.register('/billing', async () => {
             <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
                 ${isPro
                     ? '<button id="billing-portal" class="btn">Manage Subscription</button>'
-                    : '<button id="billing-upgrade" class="btn btn-primary">Upgrade to Pro — $9/mo</button>'}
+                    : (STRIPE_ENABLED
+                        ? '<button id="billing-upgrade" class="btn btn-primary">Upgrade to Pro — $9/mo</button>'
+                        : '<span class="btn btn-primary" style="opacity:0.6;cursor:not-allowed">🔒 Pro · launching soon</span>')}
             </div>
             <div id="billing-msg" style="margin-top:10px;font-size:13px;color:#e57373"></div>
         </div>
