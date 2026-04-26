@@ -279,6 +279,23 @@ const API = {
         localStorage.removeItem('session_token');
     },
 
+    // Phase 13e-5: GDPR right to erasure. Deletes the current user's account
+    // and cascades PII scrub. Soft-delete (preserved 30 days for audit).
+    async deleteAccount() {
+        const resp = await fetch(`${this.base}/api/dashboard/auth/account`, {
+            method: 'DELETE', headers: this.headers(),
+        });
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(body.error || 'Account deletion failed');
+        // Same client-side cleanup as logout.
+        this.token = '';
+        this._authCache = null;
+        this._routeCache = {};
+        Object.keys(localStorage).filter(k => k.startsWith('swr:')).forEach(k => localStorage.removeItem(k));
+        localStorage.removeItem('session_token');
+        return body;
+    },
+
     // ── Data endpoints (cached where available) ────────────────────
     daily(onUpdate)       { return this.fetchWithCache('daily', 'dashboard/daily', onUpdate); },
     performance(onUpdate) { return this.fetchWithCache('performance', 'dashboard/performance', onUpdate); },

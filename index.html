@@ -20,7 +20,7 @@
     <!-- Inter font (Linear-style typography) — non-blocking, system fallback acceptable -->
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
-    <link rel="stylesheet" href="css/style.css?v=6.3">
+    <link rel="stylesheet" href="css/style.css?v=6.4">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
 </head>
 <body>
@@ -90,8 +90,8 @@
         <a href="#/system"      data-route="/system"      data-admin-only aria-label="System status"><span class="icon" aria-hidden="true">⚙️</span><span>System</span></a>
     </nav>
 
-    <script src="js/api.js?v=6.3"></script>
-    <script src="js/app.js?v=6.3"></script>
+    <script src="js/api.js?v=6.4"></script>
+    <script src="js/app.js?v=6.4"></script>
     <script>
         // PWA service worker — best-effort, fails silently on http://localhost
         if ('serviceWorker' in navigator) {
@@ -99,6 +99,26 @@
                 navigator.serviceWorker.register('sw.js').catch(() => {});
             });
         }
+        // Cookie notice (Phase 13e — privacy/transparency).
+        // Not a consent banner: we currently use ONLY essential auth cookies,
+        // so consent isn't legally required. This is a one-time disclosure.
+        (function () {
+            try {
+                if (localStorage.getItem('cookie_notice_dismissed_v1')) return;
+                window.addEventListener('load', () => {
+                    const div = document.createElement('div');
+                    div.id = 'cookie-notice';
+                    div.setAttribute('role', 'note');
+                    div.style.cssText = 'position:fixed;bottom:16px;right:16px;max-width:340px;padding:12px 14px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:13px;line-height:1.5;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,0.3)';
+                    div.innerHTML = 'We use a single session cookie to keep you signed in. No tracking, no ads. <a href="legal/privacy.html" style="color:#60a5fa;text-decoration:underline">Privacy</a> · <button id="cookie-notice-ok" style="margin-left:8px;background:#475569;color:white;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">Got it</button>';
+                    document.body.appendChild(div);
+                    document.getElementById('cookie-notice-ok').addEventListener('click', () => {
+                        localStorage.setItem('cookie_notice_dismissed_v1', '1');
+                        div.remove();
+                    });
+                });
+            } catch (_) { /* localStorage blocked — don't break the page */ }
+        })();
     </script>
 </body>
 </html>

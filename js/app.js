@@ -1751,6 +1751,33 @@ Router.register('/billing', async () => {
                 portalBtn.textContent = 'Manage Subscription';
             }
         });
+        const deleteBtn = document.getElementById('delete-account-btn');
+        if (deleteBtn) deleteBtn.addEventListener('click', async () => {
+            const confirmation = prompt(
+                'This will permanently delete your account and personal data.\n\n' +
+                'Type DELETE (in capitals) to confirm:'
+            );
+            if (confirmation !== 'DELETE') {
+                document.getElementById('delete-account-msg').textContent =
+                    'Cancelled.';
+                return;
+            }
+            deleteBtn.disabled = true;
+            deleteBtn.textContent = 'Deleting…';
+            const msg = document.getElementById('delete-account-msg');
+            try {
+                await API.deleteAccount();
+                alert('✅ Account deleted. You will be signed out.');
+                window.location.hash = '#/login?deleted=1';
+                // Hard reload to clear all in-memory state.
+                setTimeout(() => window.location.reload(), 100);
+            } catch (e) {
+                msg.style.color = '#ef4444';
+                msg.textContent = '❌ ' + (e.message || 'Failed to delete account');
+                deleteBtn.disabled = false;
+                deleteBtn.textContent = 'Delete my account';
+            }
+        });
     }, 50);
 
     // Display query-string status from Stripe redirect
@@ -1808,6 +1835,20 @@ Router.register('/billing', async () => {
                 the paid period.<br>
                 US &amp; Canada only at this time. Sales tax handled by Stripe.
             </div>
+        </div>
+        <div class="card" style="border:1px solid #b91c1c33">
+            <div class="card-title" style="color:#ef4444">⚠ Delete account</div>
+            <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;margin-bottom:12px">
+                Permanently deletes your account and all personal data
+                (watchlist, alerts, account info). Usage analytics are
+                anonymized but preserved. You'll be signed out immediately.
+                This cannot be undone after 30 days.
+            </div>
+            <button id="delete-account-btn" class="btn"
+                    style="background:#ef4444;color:white;border-color:#b91c1c">
+                Delete my account
+            </button>
+            <div id="delete-account-msg" style="margin-top:10px;font-size:13px"></div>
         </div>
     </div>
     `;
