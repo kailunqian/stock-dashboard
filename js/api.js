@@ -188,7 +188,7 @@ const API = {
 
     // Phase 13d.2: super-admin manages co-admins
     async listCoAdmins() {
-        const resp = await fetch(`${this.base}/api/admin/co-admins`, {
+        const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
             headers: this.headers(), credentials: 'include',
         });
         const body = await resp.json().catch(() => ({}));
@@ -196,7 +196,7 @@ const API = {
         return body.co_admins || [];
     },
     async addCoAdmin(email) {
-        const resp = await fetch(`${this.base}/api/admin/co-admins`, {
+        const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -207,7 +207,7 @@ const API = {
         return body;
     },
     async removeCoAdmin(email) {
-        const resp = await fetch(`${this.base}/api/admin/co-admins`, {
+        const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -220,7 +220,7 @@ const API = {
 
     // Phase 13d.3: beta testers (manual Pro access without Stripe)
     async listBetaTesters() {
-        const resp = await fetch(`${this.base}/api/admin/beta-testers`, {
+        const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
             headers: this.headers(), credentials: 'include',
         });
         const body = await resp.json().catch(() => ({}));
@@ -228,7 +228,7 @@ const API = {
         return body.beta_testers || [];
     },
     async addBetaTester(email) {
-        const resp = await fetch(`${this.base}/api/admin/beta-testers`, {
+        const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -239,7 +239,7 @@ const API = {
         return body;
     },
     async removeBetaTester(email) {
-        const resp = await fetch(`${this.base}/api/admin/beta-testers`, {
+        const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             credentials: 'include',
