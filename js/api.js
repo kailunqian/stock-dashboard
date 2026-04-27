@@ -173,6 +173,30 @@ const API = {
         return body;
     },
 
+    // Phase 13g-5: consume the magic-link token from the URL fragment.
+    // Email links now point at the dashboard (#/verify?token=XXX) instead
+    // of azurewebsites.net (which Chrome Safe Browsing flags as suspicious
+    // for long-token URLs on shared subdomains). The dashboard fetches the
+    // verify endpoint with credentials:'include' so the browser stores the
+    // dash_jwt cookie scoped to the API host.
+    async verifyMagicLink(token) {
+        const resp = await fetch(
+            `${this.base}/api/auth/verify?token=${encodeURIComponent(token)}`,
+            {
+                credentials: 'include',
+                method: 'GET',
+                headers: { 'Accept': 'application/json' },
+            },
+        );
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok || !body.ok) {
+            throw new Error(body.error || 'invalid_or_expired');
+        }
+        // Bust the auth cache so the next checkAuth() actually round-trips.
+        this._authCache = null;
+        return body;
+    },
+
     // Phase 13c: Stripe billing
     async billingCheckout() {
         const resp = await fetch(`${this.base}/api/billing/checkout`, {

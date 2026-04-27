@@ -93,6 +93,37 @@ const Router = {
         const hash = window.location.hash.slice(1) || '/login';
         const path = hash.split('?')[0];
 
+        // Phase 13g-5: magic-link landing. Email links to #/verify?token=XXX
+        // (dashboard host), we exchange the token for the auth cookie via
+        // fetch, then route to /daily. Token stays in URL fragment only
+        // (never sent over the wire) and is stripped from history below.
+        if (path === '/verify') {
+            const qs = hash.includes('?') ? hash.slice(hash.indexOf('?') + 1) : '';
+            const token = new URLSearchParams(qs).get('token') || '';
+            const main = document.getElementById('app') || document.body;
+            if (!token) {
+                main.innerHTML = `<div style="text-align:center;padding:60px;color:#e6edf3">
+                    <h2>❌ Missing token</h2>
+                    <p><a href="#/login" style="color:#58a6ff">Back to sign in</a></p></div>`;
+                return;
+            }
+            main.innerHTML = `<div style="text-align:center;padding:60px;color:#e6edf3">
+                <h2>✅ Signing you in…</h2><p>One moment.</p></div>`;
+            try {
+                await API.verifyMagicLink(token);
+                // Strip token from history before navigating, so refresh/back
+                // doesn't try to re-consume an already-used token.
+                window.history.replaceState({}, '', window.location.pathname + '#/daily');
+                window.location.reload();
+            } catch (e) {
+                main.innerHTML = `<div style="text-align:center;padding:60px;color:#e6edf3">
+                    <h2>❌ Invalid or expired link</h2>
+                    <p>Please request a new sign-in link.</p>
+                    <p><a href="#/login" style="color:#58a6ff">Back to sign in</a></p></div>`;
+            }
+            return;
+        }
+
         // Auth check (skip for login). Memoized in API.checkAuth so navigation
         // between routes within AUTH_TTL_MS doesn't burn an extra round-trip.
         // Public (unauthenticated) routes — login, signup
