@@ -37,6 +37,7 @@ const API = {
 
     async fetch(path, opts = {}) {
         const resp = await fetch(`${this.base}/api/${path}`, {
+            credentials: 'include',
             headers: this.headers(),
             ...opts,
         });
@@ -92,6 +93,7 @@ const API = {
         let data = null;
         try {
             const cacheRes = await fetch(`${this.base}/api/cache/${cachePath}`, {
+                credentials: 'include',
                 headers: this.headers(),
             });
             if (cacheRes.status === 401) { this._handle401(); return null; }
@@ -134,6 +136,7 @@ const API = {
     // either way. Replaces legacy /api/dashboard/auth/login (allowlist-only).
     async login(email) {
         const resp = await fetch(`${this.base}/api/auth/signup`, {
+            credentials: 'include',
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -148,6 +151,7 @@ const API = {
     // a friendly error in that case.
     async signup(email, country) {
         const resp = await fetch(`${this.base}/api/auth/signup`, {
+            credentials: 'include',
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, country }),
@@ -159,6 +163,7 @@ const API = {
 
     async magicLink(email) {
         const resp = await fetch(`${this.base}/api/auth/magic-link`, {
+            credentials: 'include',
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -171,6 +176,7 @@ const API = {
     // Phase 13c: Stripe billing
     async billingCheckout() {
         const resp = await fetch(`${this.base}/api/billing/checkout`, {
+            credentials: 'include',
             method: 'POST',
             headers: this.headers(),
         });
@@ -180,6 +186,7 @@ const API = {
     },
     async billingPortal() {
         const resp = await fetch(`${this.base}/api/billing/portal`, {
+            credentials: 'include',
             method: 'POST',
             headers: this.headers(),
         });
@@ -191,6 +198,7 @@ const API = {
     // Phase 13d.2: super-admin manages co-admins
     async listCoAdmins() {
         const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
+            credentials: 'include',
             headers: this.headers(),
         });
         const body = await resp.json().catch(() => ({}));
@@ -199,6 +207,7 @@ const API = {
     },
     async addCoAdmin(email) {
         const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
+            credentials: 'include',
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -209,6 +218,7 @@ const API = {
     },
     async removeCoAdmin(email) {
         const resp = await fetch(`${this.base}/api/dashboard/admin/co-admins`, {
+            credentials: 'include',
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -221,6 +231,7 @@ const API = {
     // Phase 13d.3: beta testers (manual Pro access without Stripe)
     async listBetaTesters() {
         const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
+            credentials: 'include',
             headers: this.headers(),
         });
         const body = await resp.json().catch(() => ({}));
@@ -229,6 +240,7 @@ const API = {
     },
     async addBetaTester(email) {
         const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
+            credentials: 'include',
             method: 'POST',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -239,6 +251,7 @@ const API = {
     },
     async removeBetaTester(email) {
         const resp = await fetch(`${this.base}/api/dashboard/admin/beta-testers`, {
+            credentials: 'include',
             method: 'DELETE',
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
@@ -255,6 +268,7 @@ const API = {
         }
         try {
             const resp = await fetch(`${this.base}/api/dashboard/auth/me`, {
+                credentials: 'include',
                 headers: this.headers(),
             });
             const result = resp.ok ? await resp.json() : { authenticated: false };
@@ -268,6 +282,7 @@ const API = {
     async logout() {
         try {
             await fetch(`${this.base}/api/dashboard/auth/logout`, {
+                credentials: 'include',
                 method: 'POST', headers: this.headers(),
             });
         } catch {}
@@ -283,6 +298,7 @@ const API = {
     // and cascades PII scrub. Soft-delete (preserved 30 days for audit).
     async deleteAccount() {
         const resp = await fetch(`${this.base}/api/dashboard/auth/account`, {
+            credentials: 'include',
             method: 'DELETE', headers: this.headers(),
         });
         const body = await resp.json().catch(() => ({}));
