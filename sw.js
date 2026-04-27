@@ -10,7 +10,7 @@ const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHELL_FILES = [
     './',
     './index.html',
-    './css/style.css?v=3.8',
+    './css/style.css?v=6.6',
     './js/api.js?v=6.6',
     './js/app.js?v=6.6',
     './manifest.json'
