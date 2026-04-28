@@ -194,6 +194,22 @@ const API = {
         }
         // Bust the auth cache so the next checkAuth() actually round-trips.
         this._authCache = null;
+        // CRITICAL: nuke any stale bearer token from a previous identity.
+        // Otherwise checkAuth() sends `Authorization: Bearer <previous user>`
+        // alongside the new dash_jwt cookie, and the server's legacy
+        // blob-session path can resolve to the OLD email — landing the user
+        // on a different account than the one they just signed in as
+        // (root cause of the 2026-04-27 cross-identity bug).
+        try {
+            localStorage.removeItem('session_token');
+            // Also clear any stale per-user SWR cache entries from a prior
+            // identity so the dashboard doesn't briefly render the wrong
+            // user's data after reload.
+            Object.keys(localStorage)
+                .filter(k => k.startsWith('swr:'))
+                .forEach(k => localStorage.removeItem(k));
+        } catch (_) {}
+        this.token = '';
         return body;
     },
 
