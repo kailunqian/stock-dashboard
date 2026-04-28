@@ -455,7 +455,7 @@ Router.register('/login', async () => {
                 </form>
                 <div id="login-msg" class="login-message"></div>
                 <div class="login-footer">
-                    Want full access? ${proCta('Upgrade to Pro →', { className: '' })}<br>
+                    Want full access? ${proCta('Upgrade to Pro →', { className: '', style: 'margin-left:6px;padding:2px 8px;border-radius:6px;background:rgba(255,255,255,0.06);font-size:0.9em' })}<br>
                     <a href="legal/terms.html">Terms</a> · <a href="legal/privacy.html">Privacy</a>
                 </div>
             </div>
