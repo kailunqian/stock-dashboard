@@ -366,4 +366,5 @@ const API = {
     stock(sym)    { return this.fetch(`dashboard/stock/${sym}`); },
     budget()      { return this.fetch('dashboard/budget'); },
     system()      { return this.fetch('dashboard/system'); },
+    diagnostics() { return this.fetch('dashboard/diagnostics'); },
 };

@@ -1704,6 +1704,7 @@ Router.register('/system', async () => {
     const model = data.model || {};
     const test = data.self_test || {};
     const training = data.training || {};
+    const phaseE = data.phase_e_verdict || null;
 
     // Data sources enabled
     const sources = [];
@@ -1742,6 +1743,17 @@ Router.register('/system', async () => {
             ${training.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Samples: ${training.training_samples}</div>` : ''}
             ${training.budget_tier ? `<div style="font-size:13px;color:var(--text-secondary)">Budget: ${training.budget_tier}</div>` : ''}
         </div>` : ''}
+        ${phaseE ? `
+        <div class="card">
+            <div class="card-title">Phase E Verdict</div>
+            <div class="card-value ${phaseE.tier === 'success' ? 'positive' : (phaseE.tier === 'insufficient' ? 'negative' : 'neutral')}">
+                ${phaseE.tier === 'success' ? '✅' : (phaseE.tier === 'insufficient' ? '❌' : '⚠️')} ${phaseE.tier}
+            </div>
+            <div class="card-subtitle" style="margin-top:8px">${phaseE.per_day_rate}/day high-conviction (${phaseE.days_evaluated}d window)</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Total picks: ${phaseE.total_high_conviction}</div>
+            <div style="font-size:13px;color:var(--text-secondary)">Verdict: ${timeSince(phaseE.verdict_date)}</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;font-style:italic">${phaseE.recommendation || ''}</div>
+        </div>` : ''}
     </div>
 
     <div class="table-container">
@@ -1749,6 +1761,101 @@ Router.register('/system', async () => {
         <table>
             <thead><tr><th>Function</th><th>Status</th><th>Last Run</th></tr></thead>
             <tbody>${functionsHtml || '<tr><td colspan="3" style="text-align:center">No data</td></tr>'}</tbody>
+        </table>
+    </div>`;
+});
+
+// ── Diagnostics Page — Near-miss + gate failure analysis (admin) ────
+Router.register('/diagnostics', async () => {
+    const data = await API.diagnostics();
+    if (!data) return '<p>Failed to load</p>';
+    if (data.error) return `<p>Error: ${String(data.error)}</p>`;
+
+    const t = data.totals || {};
+    const perDay = data.per_day || {};
+    const hc = data.high_conviction_today || [];
+    const nm = data.near_miss_today || [];
+
+    const escape = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    const perDayRows = Object.keys(perDay).sort().reverse().map(d => {
+        const s = perDay[d];
+        return `<tr><td>${escape(d)}</td><td>${s.scanned}</td><td><strong>${s.high_conviction}</strong></td><td>${s.near_miss}</td></tr>`;
+    }).join('');
+
+    const hcRows = hc.length === 0
+        ? '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary)">No high-conviction picks in window</td></tr>'
+        : hc.map(c => `
+            <tr onclick="window.location.hash='#/stock/${escape(c.symbol)}'" style="cursor:pointer">
+                <td><strong>${escape(c.symbol)}</strong></td>
+                <td><span class="positive">${c.score.toFixed(1)}</span></td>
+                <td>${c.n_signals}</td>
+                <td>${escape((c.signals || []).slice(0, 3).join(', '))}</td>
+            </tr>`).join('');
+
+    const nmRows = nm.length === 0
+        ? '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary)">No near-miss candidates</td></tr>'
+        : nm.map(c => {
+            const gateChips = [
+                c.gates.score_pass ? '<span class="pill pill-green">score✓</span>' : '<span class="pill pill-red">score✗</span>',
+                c.gates.signals_pass ? '<span class="pill pill-green">sig✓</span>' : '<span class="pill pill-red">sig✗</span>',
+                c.gates.no_hard_risks ? '<span class="pill pill-green">risk✓</span>' : '<span class="pill pill-red">risk✗</span>',
+            ].join(' ');
+            return `
+            <tr onclick="window.location.hash='#/stock/${escape(c.symbol)}'" style="cursor:pointer">
+                <td><strong>${escape(c.symbol)}</strong></td>
+                <td>${c.score.toFixed(1)}</td>
+                <td>${c.n_signals}/4</td>
+                <td>${gateChips}</td>
+                <td style="font-size:12px;color:var(--text-secondary)">${escape((c.fail_reasons || []).join(' · '))}</td>
+            </tr>`;
+        }).join('');
+
+    return `
+    <div class="page-title">Diagnostics — Near-Miss Analysis</div>
+    <p style="color:var(--text-secondary);margin-top:-8px;margin-bottom:16px">
+        Why didn't more candidates make today's high-conviction list? A high-conviction pick requires
+        <strong>score ≥ 85</strong>, <strong>≥ 4 meaningful signals</strong>, and <strong>no hard risk flags</strong>.
+    </p>
+
+    <div class="card-grid">
+        <div class="card">
+            <div class="card-title">Scanned (3-day window)</div>
+            <div class="card-value">${t.scanned || 0}</div>
+        </div>
+        <div class="card">
+            <div class="card-title">High-Conviction</div>
+            <div class="card-value ${(t.high_conviction || 0) > 0 ? 'positive' : 'neutral'}">${t.high_conviction || 0}</div>
+            <div class="card-subtitle">Cleared all 3 gates</div>
+        </div>
+        <div class="card">
+            <div class="card-title">Near-Miss (75–84)</div>
+            <div class="card-value neutral">${t.near_miss || 0}</div>
+            <div class="card-subtitle">One gate away</div>
+        </div>
+    </div>
+
+    <div class="table-container" style="margin-top:24px">
+        <div class="table-header">Per-Day Breakdown</div>
+        <table>
+            <thead><tr><th>Date</th><th>Scanned</th><th>High-Conviction</th><th>Near-Miss</th></tr></thead>
+            <tbody>${perDayRows || '<tr><td colspan="4" style="text-align:center">No data</td></tr>'}</tbody>
+        </table>
+    </div>
+
+    <div class="table-container" style="margin-top:24px">
+        <div class="table-header">High-Conviction Picks</div>
+        <table>
+            <thead><tr><th>Symbol</th><th>Score</th><th>Signals</th><th>Top Signals</th></tr></thead>
+            <tbody>${hcRows}</tbody>
+        </table>
+    </div>
+
+    <div class="table-container" style="margin-top:24px">
+        <div class="table-header">Near-Miss — Why They Didn't Clear</div>
+        <table>
+            <thead><tr><th>Symbol</th><th>Score</th><th>Signals</th><th>Gates</th><th>Reasons</th></tr></thead>
+            <tbody>${nmRows}</tbody>
         </table>
     </div>`;
 });

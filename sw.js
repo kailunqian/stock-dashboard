@@ -5,14 +5,14 @@
 //   - API responses: network-first, no cache (data must be fresh).
 // Bump CACHE_VERSION any time the static shell changes shape.
 
-const CACHE_VERSION = 'sa-v6.9';
+const CACHE_VERSION = 'sa-v7.0';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHELL_FILES = [
     './',
     './index.html',
-    './css/style.css?v=6.9',
-    './js/api.js?v=6.9',
-    './js/app.js?v=6.9',
+    './css/style.css?v=7.0',
+    './js/api.js?v=7.0',
+    './js/app.js?v=7.0',
     './manifest.json'
 ];
 
