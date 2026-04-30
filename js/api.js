@@ -366,5 +366,13 @@ const API = {
     stock(sym)    { return this.fetch(`dashboard/stock/${sym}`); },
     budget()      { return this.fetch('dashboard/budget'); },
     system()      { return this.fetch('dashboard/system'); },
+    incidents()   { return this.fetch('dashboard/incidents'); },
+    resolveIncident(signature) {
+        return this.fetch('dashboard/incidents', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signature, action: 'resolve' }),
+        });
+    },
     diagnostics() { return this.fetch('dashboard/diagnostics'); },
 };

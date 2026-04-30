@@ -1690,6 +1690,61 @@ Router.register('/budget', async () => {
 Router.register('/system', async () => {
     const data = await API.system();
     if (!data) return '<p>Failed to load</p>';
+    const incidents = await API.incidents().catch(() => null);
+
+    // ── Incidents (open + recently resolved) ───────────────────────
+    const incHtml = (() => {
+        if (!incidents) return '';
+        const open = incidents.open || [];
+        const resolved = incidents.resolved_recent || [];
+        if (!open.length && !resolved.length) return '';
+        const fmtAge = (iso) => {
+            if (!iso) return '—';
+            const d = new Date(iso); const mins = Math.round((Date.now() - d) / 60000);
+            if (mins < 60) return `${mins}m ago`;
+            if (mins < 1440) return `${Math.round(mins/60)}h ago`;
+            return `${Math.round(mins/1440)}d ago`;
+        };
+        const openRows = open.map(i => `
+            <tr>
+                <td><strong>${i.function}</strong><div style="font-size:11px;color:var(--text-secondary)">${i.error_class}</div></td>
+                <td><code style="font-size:11px">${(i.error_message || '').slice(0, 120)}</code></td>
+                <td>${pill(i.count + '×', 'red')}</td>
+                <td>${fmtAge(i.first_seen)}</td>
+                <td>${fmtAge(i.last_seen)}</td>
+                <td><a href="#" onclick="window._resolveIncident('${i.signature}'); return false;" style="color:var(--accent)">mark fixed</a></td>
+            </tr>`).join('');
+        const resRows = resolved.slice(0, 10).map(i => `
+            <tr style="opacity:0.6">
+                <td><strong>${i.function}</strong><div style="font-size:11px;color:var(--text-secondary)">${i.error_class}</div></td>
+                <td><code style="font-size:11px">${(i.error_message || '').slice(0, 120)}</code></td>
+                <td>${pill('resolved', 'green')}</td>
+                <td>${fmtAge(i.resolved_at)}</td>
+            </tr>`).join('');
+        return `
+        ${open.length ? `
+        <div class="table-container" style="border:2px solid var(--negative); margin-top:8px">
+            <div class="table-header" style="color:var(--negative)">🚨 Open Incidents (${open.length})</div>
+            <table>
+                <thead><tr><th>Function / Class</th><th>Error</th><th>Count</th><th>First Seen</th><th>Last Seen</th><th></th></tr></thead>
+                <tbody>${openRows}</tbody>
+            </table>
+        </div>` : ''}
+        ${resolved.length ? `
+        <div class="table-container" style="margin-top:16px">
+            <div class="table-header">Recently Auto-Resolved (last 7d)</div>
+            <table>
+                <thead><tr><th>Function / Class</th><th>Error</th><th>Status</th><th>Resolved</th></tr></thead>
+                <tbody>${resRows}</tbody>
+            </table>
+        </div>` : ''}`;
+    })();
+
+    window._resolveIncident = async (sig) => {
+        if (!confirm('Mark this incident as fixed? It will reopen automatically if the same error fires again.')) return;
+        await API.resolveIncident(sig);
+        location.reload();
+    };
 
     const functionsHtml = (data.functions || []).map(f => {
         const statusMap = { completed: 'green', failed: 'red', skipped: 'yellow', started: 'blue' };
@@ -1701,12 +1756,71 @@ Router.register('/system', async () => {
         </tr>`;
     }).join('');
 
+    // ── Scheduled Jobs (29+ timers grouped by category) ────────────
+    const jobs = data.scheduled_jobs || [];
+    const statusMap2 = { completed: 'green', failed: 'red', skipped: 'yellow', started: 'blue', stalled: 'red' };
+    const fmtNext = (iso) => {
+        if (!iso) return '—';
+        try {
+            const d = new Date(iso); const mins = Math.round((d - Date.now()) / 60000);
+            if (mins <= 0) return 'imminent';
+            if (mins < 60) return `in ${mins}m`;
+            if (mins < 1440) return `in ${Math.round(mins/60)}h`;
+            return `in ${Math.round(mins/1440)}d`;
+        } catch { return '—'; }
+    };
+    const cats = {};
+    jobs.forEach(j => { (cats[j.category] = cats[j.category] || []).push(j); });
+    const catOrder = ['scan', 'monitoring', 'training', 'evaluation', 'maintenance'];
+    const catLabel = { scan: '📈 Market Scans', monitoring: '🔍 Monitors', training: '🧠 Training & Learning', evaluation: '✅ Evaluation & Health', maintenance: '🛠 Maintenance' };
+    const jobsHtml = catOrder.filter(c => cats[c] && cats[c].length).map(cat => {
+        const rows = cats[cat].map(j => {
+            const ratio = `${j.runs_today}/${j.expected_today}`;
+            let ratioColor = 'neutral';
+            if (j.expected_today > 0) {
+                if (j.runs_today >= j.expected_today && j.failed_today === 0) ratioColor = 'positive';
+                else if (j.runs_today === 0) ratioColor = 'negative';
+            }
+            const statusBadge = j.last_status ? pill(j.last_status, statusMap2[j.last_status] || 'blue') : '<span style="color:var(--text-secondary)">—</span>';
+            const failBadge = j.failed_today > 0 ? ` ${pill(j.failed_today + ' failed', 'red')}` : '';
+            return `
+            <tr>
+                <td>
+                    <strong>${j.name}</strong>${j.trading_only ? ' ' + pill('trading days', 'yellow') : ''}
+                    <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${j.description}</div>
+                </td>
+                <td><code style="font-size:11px">${j.schedule}</code></td>
+                <td>${statusBadge}${failBadge}</td>
+                <td>${timeSince(j.last_timestamp)}</td>
+                <td><span class="${ratioColor}" style="font-weight:600">${ratio}</span></td>
+                <td>${fmtNext(j.next_run)}</td>
+            </tr>`;
+        }).join('');
+        return `
+        <div class="table-container" style="margin-top:16px">
+            <div class="table-header">${catLabel[cat] || cat}</div>
+            <table>
+                <thead><tr><th>Function</th><th>Schedule (UTC)</th><th>Status</th><th>Last Run</th><th>Today (ran/expected)</th><th>Next Run</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }).join('');
+
+    const totalRuns = jobs.reduce((s, j) => s + (j.runs_today || 0), 0);
+    const totalExpected = jobs.reduce((s, j) => s + (j.expected_today || 0), 0);
+    const totalFailed = jobs.reduce((s, j) => s + (j.failed_today || 0), 0);
+    const jobsSummaryHtml = jobs.length ? `
+        <div class="card">
+            <div class="card-title">Scheduled Jobs Today</div>
+            <div class="card-value ${totalFailed > 0 ? 'negative' : (totalRuns >= totalExpected ? 'positive' : 'neutral')}">${totalRuns}/${totalExpected}</div>
+            <div class="card-subtitle">${jobs.length} timers · ${totalFailed} failed</div>
+        </div>` : '';
+
     const model = data.model || {};
     const test = data.self_test || {};
     const training = data.training || {};
     const phaseE = data.phase_e_verdict || null;
 
-    // Data sources enabled
     const sources = [];
     if (model.has_llm) sources.push('LLM');
     if (model.has_fq) sources.push('FQ');
@@ -1716,6 +1830,7 @@ Router.register('/system', async () => {
 
     return `
     <div class="page-title">System Health</div>
+    ${incHtml}
 
     <div class="card-grid">
         <div class="card">
@@ -1754,15 +1869,18 @@ Router.register('/system', async () => {
             <div style="font-size:13px;color:var(--text-secondary)">Verdict: ${timeSince(phaseE.verdict_date)}</div>
             <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;font-style:italic">${phaseE.recommendation || ''}</div>
         </div>` : ''}
+        ${jobsSummaryHtml}
     </div>
 
     <div class="table-container">
-        <div class="table-header">Function Status</div>
+        <div class="table-header">Function Status (recent)</div>
         <table>
             <thead><tr><th>Function</th><th>Status</th><th>Last Run</th></tr></thead>
             <tbody>${functionsHtml || '<tr><td colspan="3" style="text-align:center">No data</td></tr>'}</tbody>
         </table>
-    </div>`;
+    </div>
+
+    ${jobsHtml}`;
 });
 
 // ── Diagnostics Page — Near-miss + gate failure analysis (admin) ────
