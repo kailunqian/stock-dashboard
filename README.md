@@ -4,6 +4,8 @@ Read-only stock analysis dashboard powered by AI/ML — displays results from sc
 
 **🌐 Live: [kailunqian.github.io/stock-dashboard](https://kailunqian.github.io/stock-dashboard/)**
 
+> Part of the [stock-ecosystem](https://github.com/kailunqian/stock-ecosystem) — see architecture, repo registry, and ADRs there.
+
 ## Features
 
 ### Pages
