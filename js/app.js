@@ -1608,6 +1608,76 @@ Router.register('/stock', async () => {
 });
 
 // Dynamic stock route handler
+// ── LWC chart helper (Tier 1: TradingView Lightweight Charts) ─────
+// Renders a candle chart with horizontal price lines for buy/target/stop.
+// Tolerant of LWC v4 (addCandlestickSeries) and v5 (addSeries(CandlestickSeries)).
+function renderLwcChart(elId, candles, levels) {
+    const el = document.getElementById(elId);
+    if (!el || !candles || !candles.length || typeof LightweightCharts === 'undefined') return;
+    try {
+        const chart = LightweightCharts.createChart(el, {
+            width: el.clientWidth,
+            height: el.clientHeight,
+            layout: {
+                background: { color: 'transparent' },
+                textColor: getComputedStyle(document.body).getPropertyValue('--text-primary') || '#ddd',
+                attributionLogo: true,  // required by LWC license
+            },
+            grid: {
+                vertLines: { color: 'rgba(120,120,120,0.1)' },
+                horzLines: { color: 'rgba(120,120,120,0.1)' },
+            },
+            rightPriceScale: { borderVisible: false },
+            timeScale: { borderVisible: false, timeVisible: false },
+        });
+
+        // v5: addSeries(LightweightCharts.CandlestickSeries, opts)
+        // v4: addCandlestickSeries(opts)
+        const candleOpts = {
+            upColor: '#26a69a', downColor: '#ef5350',
+            borderUpColor: '#26a69a', borderDownColor: '#ef5350',
+            wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+        };
+        let series;
+        if (typeof chart.addSeries === 'function' && LightweightCharts.CandlestickSeries) {
+            series = chart.addSeries(LightweightCharts.CandlestickSeries, candleOpts);
+        } else if (typeof chart.addCandlestickSeries === 'function') {
+            series = chart.addCandlestickSeries(candleOpts);
+        } else {
+            return;
+        }
+        series.setData(candles);
+
+        // Horizontal price overlays
+        const lines = [
+            { p: levels.current,     color: '#888888', title: 'Now' },
+            { p: levels.buy,         color: '#42a5f5', title: 'Buy' },
+            { p: levels.targetShort, color: '#66bb6a', title: 'T1' },
+            { p: levels.targetLong,  color: '#2e7d32', title: 'T2' },
+            { p: levels.stop,        color: '#ef5350', title: 'Stop' },
+        ];
+        lines.forEach(l => {
+            if (typeof l.p !== 'number' || !isFinite(l.p)) return;
+            try {
+                series.createPriceLine({
+                    price: l.p, color: l.color, lineWidth: 1,
+                    lineStyle: 2, axisLabelVisible: true, title: l.title,
+                });
+            } catch (_) { /* ignore */ }
+        });
+
+        chart.timeScale().fitContent();
+
+        // Resize on viewport changes
+        const ro = new ResizeObserver(() => {
+            try { chart.applyOptions({ width: el.clientWidth, height: el.clientHeight }); } catch (_) {}
+        });
+        ro.observe(el);
+    } catch (e) {
+        console.warn('LWC chart render failed:', e);
+    }
+}
+
 async function renderStockDetail(symbol) {
     // Phase 13d.3: per-stock drilldown is Pro — blur teaser for Free impersonation
     if (effectiveViewAsTier() === 'free') {
@@ -1659,6 +1729,28 @@ async function renderStockDetail(symbol) {
     const signalsHtml = (data.signals || []).map(s => pill(s, 'green')).join(' ');
     const risksHtml = (data.risks || []).map(r => pill(r, 'red')).join(' ');
 
+    // Tier 1: Lightweight Charts candle chart with buy/target/stop overlays.
+    // Defer the chart init until the DOM node exists.
+    const chartId = `lwc-${data.symbol}-${Date.now()}`;
+    const history = Array.isArray(data.history) ? data.history : [];
+    if (history.length > 0 && typeof LightweightCharts !== 'undefined') {
+        setTimeout(() => renderLwcChart(chartId, history, {
+            buy: data.buy_price,
+            targetShort: data.target_short,
+            targetLong: data.target_long,
+            stop: data.stop_loss,
+            current: data.current_price,
+        }), 0);
+    }
+    const chartHtml = history.length > 0
+        ? `<div class="card"><div class="card-title">Price Chart (90d) — buy/target/stop overlaid</div>
+             <div id="${chartId}" style="width:100%;height:380px"></div>
+             <div style="font-size:11px;color:var(--text-secondary);margin-top:6px;text-align:right">
+               Charting by <a href="https://www.tradingview.com/" target="_blank" rel="noopener" style="color:inherit">TradingView</a>
+             </div>
+           </div>`
+        : '';
+
     return `
     <div class="page-title">${data.recommendation_emoji || ''} ${data.symbol} — ${data.recommendation}</div>
 
@@ -1690,6 +1782,8 @@ async function renderStockDetail(symbol) {
             <div class="card-value negative">$${data.stop_loss?.toFixed(2) || '—'}</div>
         </div>
     </div>
+
+    ${chartHtml}
 
     <div class="flow-container">
         <div class="flow-title">Decision Flow — How This Score Was Made</div>

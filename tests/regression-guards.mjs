@@ -133,6 +133,42 @@ const ok   = (name)      => console.log(`✅ ${name}`);
 }
 
 console.log('');
+
+// ─── 6. Lightweight Charts wired on per-symbol drilldown (Tier 1) ───────
+{
+    const html = read('index.html');
+    const app  = read('js/app.js');
+    const sw   = read('sw.js');
+    const errs = [];
+    if (!/lightweight-charts/i.test(html)) {
+        errs.push('index.html missing lightweight-charts script tag');
+    }
+    if (!/renderLwcChart\s*\(/.test(app) || !/function\s+renderLwcChart/.test(app)) {
+        errs.push('app.js missing renderLwcChart helper or its invocation');
+    }
+    if (!/attributionLogo:\s*true/.test(app)) {
+        errs.push('app.js: LWC chart must enable attributionLogo (license requirement)');
+    }
+    if (!/data\.history/.test(app)) {
+        errs.push('app.js: renderStockDetail must consume data.history from API');
+    }
+    // Cache version must be bumped past the last shipped version when LWC was added (7.7).
+    const m = sw.match(/CACHE_VERSION\s*=\s*['"]sa-v(\d+)\.(\d+)['"]/);
+    if (!m) {
+        errs.push('sw.js: CACHE_VERSION not parseable');
+    } else {
+        const major = parseInt(m[1], 10), minor = parseInt(m[2], 10);
+        if (major < 7 || (major === 7 && minor < 8)) {
+            errs.push(`sw.js: CACHE_VERSION sa-v${major}.${minor} must be ≥ sa-v7.8 (LWC shipped in 7.8)`);
+        }
+    }
+    if (errs.length) {
+        fail('LWC chart wiring (Tier 1)', errs.join('\n   '));
+    } else {
+        ok('LWC chart: script tag, renderLwcChart, attribution, history field, cache version all wired');
+    }
+}
+
 if (failures.length > 0) {
     console.error(`\n💥 ${failures.length} regression guard(s) failed:\n`);
     for (const f of failures) console.error(f + '\n');
