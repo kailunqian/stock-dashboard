@@ -1784,14 +1784,17 @@ Router.register('/system', async () => {
     const catLabel = { scan: '📈 Market Scans', monitoring: '🔍 Monitors', training: '🧠 Training & Learning', evaluation: '✅ Evaluation & Health', maintenance: '🛠 Maintenance' };
     const jobsHtml = catOrder.filter(c => cats[c] && cats[c].length).map(cat => {
         const rows = cats[cat].map(j => {
-            const ratio = `${j.runs_today}/${j.expected_today}`;
+            const ran = (j.runs_recent ?? j.runs_today) || 0;
+            const expected = (j.expected_recent ?? j.expected_today) || 0;
+            const failed = (j.failed_recent ?? j.failed_today) || 0;
+            const ratio = `${ran}/${expected}`;
             let ratioColor = 'neutral';
-            if (j.expected_today > 0) {
-                if (j.runs_today >= j.expected_today && j.failed_today === 0) ratioColor = 'positive';
-                else if (j.runs_today === 0) ratioColor = 'negative';
+            if (expected > 0) {
+                if (ran >= expected && failed === 0) ratioColor = 'positive';
+                else if (ran === 0) ratioColor = 'negative';
             }
             const statusBadge = j.last_status ? pill(j.last_status, statusMap2[j.last_status] || 'blue') : '<span style="color:var(--text-secondary)">—</span>';
-            const failBadge = j.failed_today > 0 ? ` ${pill(j.failed_today + ' failed', 'red')}` : '';
+            const failBadge = failed > 0 ? ` ${pill(failed + ' failed', 'red')}` : '';
             return `
             <tr>
                 <td>
@@ -1809,20 +1812,20 @@ Router.register('/system', async () => {
         <div class="table-container" style="margin-top:16px">
             <div class="table-header">${catLabel[cat] || cat}</div>
             <table>
-                <thead><tr><th>Function</th><th>Schedule (UTC)</th><th>Status</th><th>Last Run</th><th>Today (ran/expected)</th><th>Next Run</th></tr></thead>
+                <thead><tr><th>Function</th><th>Schedule (UTC)</th><th>Status</th><th>Last Run</th><th>Last 24h (ran/expected)</th><th>Next Run</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
     }).join('');
 
-    const totalRuns = jobs.reduce((s, j) => s + (j.runs_today || 0), 0);
-    const totalExpected = jobs.reduce((s, j) => s + (j.expected_today || 0), 0);
-    const totalFailed = jobs.reduce((s, j) => s + (j.failed_today || 0), 0);
+    const totalRuns = jobs.reduce((s, j) => s + ((j.runs_recent ?? j.runs_today) || 0), 0);
+    const totalExpected = jobs.reduce((s, j) => s + ((j.expected_recent ?? j.expected_today) || 0), 0);
+    const totalFailed = jobs.reduce((s, j) => s + ((j.failed_recent ?? j.failed_today) || 0), 0);
     const jobsSummaryHtml = jobs.length ? `
         <div class="card">
-            <div class="card-title">Scheduled Jobs Today</div>
+            <div class="card-title">Scheduled Jobs (last 24h)</div>
             <div class="card-value ${totalFailed > 0 ? 'negative' : (totalRuns >= totalExpected ? 'positive' : 'neutral')}">${totalRuns}/${totalExpected}</div>
-            <div class="card-subtitle">${jobs.length} timers · ${totalFailed} failed</div>
+            <div class="card-subtitle">${jobs.length} timers · ${totalFailed} failed · rolling window</div>
         </div>` : '';
 
     const model = data.model || {};
