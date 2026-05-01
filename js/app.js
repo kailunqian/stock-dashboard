@@ -437,7 +437,7 @@ Router.register('/login', async () => {
                 <li>✓ Backed by live hit-rate &amp; calibration data</li>
                 <li>✓ No brokerage linking — read-only signals</li>
             </ul>
-            <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
+            <div class="btn-row" style="margin-top:24px;gap:12px">
                 ${proCta('Get Pro — $9/mo →')}
                 <a href="#teaser" class="btn btn-ghost">See a sample ↓</a>
             </div>
@@ -2138,7 +2138,7 @@ Router.register('/billing', async () => {
                     ? 'Real-time picks, full history, charts, drilldowns, watchlist'
                     : 'Top 1 pick/day · 7-day delay · 7-day history'}
             </div>
-            <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap">
+            <div class="btn-row" style="margin-top:16px">
                 ${isPro
                     ? '<button id="billing-portal" class="btn">Manage Subscription</button>'
                     : (STRIPE_ENABLED
@@ -2324,9 +2324,9 @@ Router.register('/admin', async () => {
 
     <div class="card" style="margin-top:18px">
         <div class="card-title">Add co-admin</div>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <div class="input-action-row" style="margin-top:12px">
             <input id="coadmin-email" type="email" placeholder="email@example.com"
-                   class="login-input" style="flex:1;min-width:240px;margin:0" />
+                   class="login-input" />
             <button id="coadmin-add-btn" class="btn btn-primary">Promote to co-admin</button>
         </div>
         <div id="coadmin-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>
@@ -2370,9 +2370,9 @@ Router.register('/admin', async () => {
 
     <div class="card" style="margin-top:18px">
         <div class="card-title">Add beta tester</div>
-        <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <div class="input-action-row" style="margin-top:12px">
             <input id="beta-email" type="email" placeholder="email@example.com"
-                   class="login-input" style="flex:1;min-width:240px;margin:0" />
+                   class="login-input" />
             <button id="beta-add-btn" class="btn btn-primary">Add as beta tester</button>
         </div>
         <div id="beta-msg" style="margin-top:10px;font-size:13px;color:var(--text-secondary)"></div>

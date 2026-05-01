@@ -798,7 +798,6 @@ tr:last-child td { border-bottom: none; }
     background-size: 150% 150%;
     background-position: 0% 50%;
     color: #fff;
-    width: 100%;
     box-shadow:
         0 1px 2px rgba(0,0,0,0.4),
         0 8px 24px -8px rgba(94,106,210,0.55),
@@ -825,6 +824,47 @@ tr:last-child td { border-bottom: none; }
     cursor: not-allowed;
     transform: none;
     box-shadow: none;
+}
+
+/* Login submit + signup CTA are the only places we want a full-width primary
+   button. Scope explicitly instead of leaking width:100% onto every .btn-primary
+   (which used to push neighbours onto the next line in inline button rows). */
+#login-form .btn-primary,
+#signup-pro-btn,
+.login-box form .btn-primary {
+    width: 100%;
+}
+
+/* ── Button row utilities ───────────────────────────────────
+   Use .btn-row for groups of action buttons (replaces ad-hoc
+   `style="display:flex;gap:8px;flex-wrap:wrap"` rows).
+   Use .input-action-row for an input + submit button on the
+   same baseline (e.g. add co-admin, add beta tester). */
+.btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.btn-row > .btn,
+.btn-row > button,
+.btn-row > a.btn {
+    flex: 0 0 auto;
+}
+
+.input-action-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+.input-action-row > .login-input,
+.input-action-row > input {
+    flex: 1 1 240px;
+    margin: 0;
+}
+.input-action-row > .btn {
+    flex: 0 0 auto;
 }
 
 .login-message {
@@ -1031,8 +1071,30 @@ tr:last-child td { border-bottom: none; }
         opacity: 0.6;
     }
 
-    /* ─ Touch-friendly buttons & pills ─ */
-    .btn { padding: 12px 20px; min-height: 44px; }
+    /* ─ Touch-friendly buttons & pills ─
+       Unify ALL .btn variants (.btn-ghost, .btn-unlock, .btn-primary) to the
+       same touch target so mixed button rows line up cleanly. Without this,
+       .btn-ghost (8px 16px) and .btn-unlock (10px 22px) keep their desktop
+       padding on mobile and look visibly shorter than sibling .btn buttons. */
+    .btn,
+    .btn-ghost,
+    .btn-unlock {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 12px 20px;
+    }
+    /* Bare <button> elements inside content (chart timeframe selector, etc.)
+       also need a touch-friendly target since they don't carry .btn. */
+    .chart-timeframe { flex-wrap: wrap; }
+    .chart-timeframe button {
+        min-height: 44px;
+        padding: 10px 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
     .pill { padding: 4px 10px; font-size: 12px; }
 
     /* ─ Login: tighter padding on small screens, but still comfortable ─ */
