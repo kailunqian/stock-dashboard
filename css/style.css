@@ -867,6 +867,76 @@ tr:last-child td { border-bottom: none; }
     flex: 0 0 auto;
 }
 
+/* ── Daily picks: card layout on mobile ──────────────────────
+   The 8-column picks table is dense; on mobile we hide it and
+   render a stacked card list instead. Both are emitted by the
+   same render path; CSS picks which is visible. */
+.picks-cards { display: none; }
+.pick-card {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "head    score"
+        "grid    grid"
+        "signal  signal";
+    gap: 10px 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background var(--duration) var(--ease);
+}
+.pick-card:last-child { border-bottom: none; }
+.pick-card:active { background: var(--bg-elevated); }
+.pick-card-head {
+    grid-area: head;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.pick-card-id {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.pick-card-symbol {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+.pick-card .score-ring { grid-area: score; }
+.pick-card-grid {
+    grid-area: grid;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px 12px;
+    font-size: 13px;
+}
+.pick-card-grid > div { display: flex; flex-direction: column; gap: 2px; }
+.pick-card-grid > div > span {
+    color: var(--text-secondary);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.pick-card-grid > div > strong {
+    color: var(--text-primary);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.pick-card-signal {
+    grid-area: signal;
+    color: var(--text-secondary);
+    font-size: 12px;
+    line-height: 1.4;
+}
+.pick-card-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
 .login-message {
     margin-top: 20px;
     font-size: 13px;
@@ -1070,6 +1140,12 @@ tr:last-child td { border-bottom: none; }
         pointer-events: none;
         opacity: 0.6;
     }
+
+    /* Daily picks: hide the dense table, show stacked cards */
+    .picks-table { display: none; }
+    .picks-cards { display: block; }
+    /* No need for the right-edge fade when the table is hidden */
+    .table-container:has(.picks-cards)::after { display: none; }
 
     /* ─ Touch-friendly buttons & pills ─
        Unify ALL .btn variants (.btn-ghost, .btn-unlock, .btn-primary) to the
