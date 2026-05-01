@@ -375,4 +375,7 @@ const API = {
         });
     },
     diagnostics() { return this.fetch('dashboard/diagnostics'); },
+    v2ShadowSummary(days = 7) {
+        return this.fetch(`dashboard/admin/v2-shadow-summary?days=${days}`);
+    },
 };

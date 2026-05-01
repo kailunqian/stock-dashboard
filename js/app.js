@@ -1894,7 +1894,10 @@ Router.register('/system', async () => {
 
 // ── Diagnostics Page — Near-miss + gate failure analysis (admin) ────
 Router.register('/diagnostics', async () => {
-    const data = await API.diagnostics();
+    const [data, v2] = await Promise.all([
+        API.diagnostics(),
+        API.v2ShadowSummary(7).catch(() => null),
+    ]);
     if (!data) return '<p>Failed to load</p>';
     if (data.error) return `<p>Error: ${String(data.error)}</p>`;
 
@@ -1937,6 +1940,64 @@ Router.register('/diagnostics', async () => {
                 <td style="font-size:12px;color:var(--text-secondary)">${escape((c.fail_reasons || []).join(' · '))}</td>
             </tr>`;
         }).join('');
+
+    // ── v2 Conviction Shadow section (Phase 1 observability tile) ──
+    let v2Section = '';
+    if (v2 && !v2.error && v2.totals) {
+        const vt = v2.totals;
+        const enforce = !!v2.scoring_v2_enforce;
+        const enforceBadge = enforce
+            ? '<span class="pill pill-green">ENFORCE ON</span>'
+            : '<span class="pill" style="background:var(--bg-secondary);color:var(--text-secondary)">shadow mode</span>';
+        const v2OnlyRows = (v2.v2_only_picks || []).length === 0
+            ? '<tr><td colspan="6" style="text-align:center;color:var(--text-secondary)">No v2-only picks in window</td></tr>'
+            : v2.v2_only_picks.map(p => `
+                <tr onclick="window.location.hash='#/stock/${escape(p.symbol)}'" style="cursor:pointer">
+                    <td>${escape(p.date)}</td>
+                    <td><strong>${escape(p.symbol)}</strong></td>
+                    <td>${p.legacy_score}</td>
+                    <td><span class="pill pill-green">${escape(p.v2_tier)}</span></td>
+                    <td>${escape(p.v2_path)}</td>
+                    <td style="font-size:12px;color:var(--text-secondary)">cat=${p.catalyst_score} · ${escape((p.signals || []).slice(0,3).join(' · '))}</td>
+                </tr>`).join('');
+        v2Section = `
+        <div class="page-title" style="margin-top:32px">v2 Conviction Shadow ${enforceBadge}</div>
+        <p style="color:var(--text-secondary);margin-top:-8px;margin-bottom:16px">
+            Phase 1 conviction layer running alongside legacy scorer. <strong>v2_only</strong> = picks v2 says Buy/Strong Buy that legacy missed entirely. Last ${v2.days_window} days, replayed from stored Predictions.
+        </p>
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-title">Legacy Buy+</div>
+                <div class="card-value">${(vt.legacy_strong_buy || 0) + (vt.legacy_buy || 0)}</div>
+                <div class="card-subtitle">SB ${vt.legacy_strong_buy || 0} · B ${vt.legacy_buy || 0}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">v2 Buy+</div>
+                <div class="card-value ${((vt.v2_strong_buy || 0) + (vt.v2_buy || 0)) > 0 ? 'positive' : 'neutral'}">${(vt.v2_strong_buy || 0) + (vt.v2_buy || 0)}</div>
+                <div class="card-subtitle">SB ${vt.v2_strong_buy || 0} · B ${vt.v2_buy || 0}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">v2-Only Unlocks</div>
+                <div class="card-value ${(vt.v2_only || 0) > 0 ? 'positive' : 'neutral'}">${vt.v2_only || 0}</div>
+                <div class="card-subtitle">Legacy missed these</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Agreement</div>
+                <div class="card-value">${vt.agree_buy_or_above || 0}</div>
+                <div class="card-subtitle">Legacy-only ${vt.legacy_only || 0}</div>
+            </div>
+        </div>
+        <div class="table-container" style="margin-top:24px">
+            <div class="table-header">v2-Only Picks (last ${v2.days_window}d)</div>
+            <table>
+                <thead><tr><th>Date</th><th>Symbol</th><th>Legacy Score</th><th>v2 Tier</th><th>Path</th><th>Why</th></tr></thead>
+                <tbody>${v2OnlyRows}</tbody>
+            </table>
+        </div>`;
+    } else if (v2 && v2.error) {
+        v2Section = `<div class="page-title" style="margin-top:32px">v2 Conviction Shadow</div>
+            <p style="color:var(--text-secondary)">Error loading v2 shadow data: ${escape(String(v2.error))}</p>`;
+    }
 
     return `
     <div class="page-title">Diagnostics — Near-Miss Analysis</div>
@@ -1984,7 +2045,8 @@ Router.register('/diagnostics', async () => {
             <thead><tr><th>Symbol</th><th>Score</th><th>Signals</th><th>Gates</th><th>Reasons</th></tr></thead>
             <tbody>${nmRows}</tbody>
         </table>
-    </div>`;
+    </div>
+    ${v2Section}`;
 });
 
 // ── Billing Page (Phase 13c) ─────────────────────────────────────────
