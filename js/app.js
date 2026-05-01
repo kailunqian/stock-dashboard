@@ -1321,8 +1321,17 @@ Router.register('/performance', async () => {
     const strategies = data.strategies || [];
     let strategyHtml = '';
     if (strategies.length > 0) {
-        const trendIcon = t => t === 'improving' ? '↑' : (t === 'declining' ? '↓' : '→');
+        const trendIcon = t => t === 'improving' ? '↑' : (t === 'declining' ? '↓' : (t === 'stable' ? '→' : '—'));
         const trendColor = t => t === 'improving' ? 'var(--accent-green)' : (t === 'declining' ? 'var(--accent-red)' : 'var(--text-secondary)');
+        const statusBadge = (s) => {
+            if (!s.status) return '';
+            const colors = { active: 'var(--accent-green)', shadow: 'var(--accent-yellow, #d4a017)', retired: 'var(--text-secondary)', disabled: 'var(--text-secondary)' };
+            const c = colors[s.status] || 'var(--text-secondary)';
+            return `<span style="font-size:10px;padding:1px 5px;border-radius:3px;border:1px solid ${c};color:${c};margin-left:6px;vertical-align:middle">${s.status}</span>`;
+        };
+        const promoteBadge = (s) => s.promote_candidate
+            ? `<span title="Shadow strategy with confident-sample positive edge — consider promoting" style="font-size:10px;padding:1px 5px;border-radius:3px;background:var(--accent-green);color:#000;margin-left:6px;vertical-align:middle">★ promote</span>`
+            : '';
         strategyHtml = `
         <div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Strategy Leaderboard</div>
         <div class="table-container">
@@ -1336,9 +1345,9 @@ Router.register('/performance', async () => {
                 </thead>
                 <tbody>
                     ${strategies.map((s, i) => `
-                    <tr>
+                    <tr style="${s.low_sample ? 'opacity:0.65' : ''}">
                         <td>${i + 1}</td>
-                        <td><strong>${s.name}</strong></td>
+                        <td><strong>${s.name}</strong>${statusBadge(s)}${promoteBadge(s)}</td>
                         <td>
                             <div class="weight-bar" style="width:80px;display:inline-block;vertical-align:middle;margin-right:6px">
                                 <div class="weight-bar-fill ${s.hit_rate_7d >= 0.5 ? 'technical' : 'news'}" style="width:${(s.hit_rate_7d * 100).toFixed(0)}%"></div>
@@ -1347,8 +1356,8 @@ Router.register('/performance', async () => {
                         </td>
                         <td class="${pctClass(s.avg_return_7d)}">${pctSign(s.avg_return_7d)}</td>
                         <td class="${pctClass(s.avg_return_1d)}">${pctSign(s.avg_return_1d)}</td>
-                        <td>${s.total_picks}</td>
-                        <td style="color:${trendColor(s.trend)}">${trendIcon(s.trend)} ${s.trend}</td>
+                        <td>${s.total_picks}${s.low_sample ? ' <span title="Less than 5 picks — treat with caution" style="font-size:10px;color:var(--text-secondary)">(low n)</span>' : ''}</td>
+                        <td style="color:${trendColor(s.trend)}">${trendIcon(s.trend)}${s.trend ? ' ' + s.trend : ''}</td>
                     </tr>`).join('')}
                 </tbody>
             </table>
