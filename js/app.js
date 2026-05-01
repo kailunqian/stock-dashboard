@@ -131,9 +131,41 @@ const Router = {
         if (!PUBLIC_ROUTES.has(path)) {
             const auth = await API.checkAuth();
             if (!auth.authenticated) {
+                // Auth-bounce detection: if there's a pending magic-verify
+                // sentinel from the same session, then verify must have
+                // succeeded (or we wouldn't have reached the post-reload
+                // route handler) but the cookie/JWT didn't stick. That's
+                // the most pernicious failure mode of the magic-link flow
+                // because it's silent — the user just gets dumped back to
+                // /login with no clue why. Report it.
+                try {
+                    const raw = sessionStorage.getItem('pending_magic_verify');
+                    if (raw) {
+                        sessionStorage.removeItem('pending_magic_verify');
+                        let pending = null;
+                        try { pending = JSON.parse(raw); } catch (_) {}
+                        const ageMs = pending && pending.ts ? (Date.now() - pending.ts) : -1;
+                        // Only report if it was recent (<10 min). Stale
+                        // sentinels from prior tabs aren't actionable.
+                        if (ageMs >= 0 && ageMs < 10 * 60 * 1000) {
+                            window.IncidentReporter && window.IncidentReporter.report({
+                                kind: 'auth-bounce',
+                                function: 'Router.handleRoute',
+                                error_class: 'AuthBounce',
+                                message: 'verify ok but checkAuth failed; reason=' +
+                                         (auth.reason || 'unknown') +
+                                         ' age_ms=' + ageMs +
+                                         (auth._err ? ' err=' + auth._err : ''),
+                            });
+                        }
+                    }
+                } catch (_) {}
                 window.location.hash = '#/login';
                 return;
             }
+            // Authenticated path: clear any lingering sentinel — verify
+            // worked end-to-end.
+            try { sessionStorage.removeItem('pending_magic_verify'); } catch (_) {}
             document.getElementById('user-email').textContent = auth.email;
             document.getElementById('nav').style.display = 'flex';
             // Bottom-nav: visible on mobile only — controlled entirely by
@@ -292,6 +324,35 @@ window.addEventListener('hashchange', () => {
 function pctClass(val) { return val >= 0 ? 'positive' : 'negative'; }
 function pctSign(val) { return val >= 0 ? `+${val.toFixed(1)}%` : `${val.toFixed(1)}%`; }
 function pill(text, type) { return `<span class="pill pill-${type}">${text}</span>`; }
+
+// Build a mobile-friendly card for a single pick. Used alongside the daily
+// picks table; CSS toggles which layout is visible (table on desktop,
+// cards on ≤768px). Keeping both in the DOM avoids a second JS render path.
+function pickCard(p, opts = {}) {
+    const locked = !!opts.locked;
+    const sc = Math.max(0, Math.min(100, Math.round(p.score || 0)));
+    const ringClass = sc >= 85 ? 'success' : sc >= 70 ? '' : 'danger';
+    const ring = `<div class="score-ring ${ringClass}" style="--score:${sc};--size:48px"><span>${sc}</span></div>`;
+    const keySignal = (p.signals || [])[0] || '—';
+    const fmt = (v) => (v != null ? '$' + v.toFixed(2) : '—');
+    const onclick = locked ? '' : `onclick="window.location.hash='#/stock/${p.symbol}'"`;
+    return `
+    <div class="pick-card${locked ? ' locked-row' : ''}" ${onclick}>
+        <div class="pick-card-head">
+            <div class="pick-card-id">
+                <strong class="pick-card-symbol">${p.symbol}</strong>
+                ${p.recommendation ? recPill(p.recommendation) : ''}
+            </div>
+            ${ring}
+        </div>
+        <div class="pick-card-grid">
+            <div><span>Entry</span><strong>${fmt(p.buy_price ?? p.current_price)}</strong></div>
+            <div><span>Target</span><strong>${fmt(p.target_short)}</strong></div>
+            <div><span>Stop</span><strong>${fmt(p.stop_loss)}</strong></div>
+        </div>
+        <div class="pick-card-signal">${keySignal}</div>
+    </div>`;
+}
 
 function recPill(rec) {
     const map = {
@@ -743,6 +804,7 @@ Router.register('/daily', async () => {
 
     // Today's picks — score-ring in the score column for visual punch
     let picksHtml = '';
+    let picksCardsHtml = '';
     if (scan.top_picks && scan.top_picks.length > 0) {
         picksHtml = scan.top_picks.map(p => {
             const keySignal = (p.signals || [])[0] || '—';
@@ -761,6 +823,7 @@ Router.register('/daily', async () => {
                 <td>${keySignal}</td>
             </tr>`;
         }).join('');
+        picksCardsHtml = scan.top_picks.map(p => pickCard(p)).join('');
 
         // Phase 13d.3: blurred teaser rows + Unlock CTA when tier-gated
         const lockedPicks = scan._locked_picks || [];
@@ -791,13 +854,25 @@ Router.register('/daily', async () => {
                         ${proCta('Unlock with Pro →', { className: 'btn-primary' })}
                     </div>
                 </td></tr>`;
+            picksCardsHtml += lockedPicks.map(p => pickCard(p, { locked: true })).join('') + `
+                <div class="unlock-cta">
+                    <div>
+                        <strong>🔒 ${lockedPicks.length} more pick${lockedPicks.length > 1 ? 's' : ''} hidden</strong>
+                        <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">
+                            Unlock all daily picks, per-stock drilldowns, and real-time alerts with Pro.
+                        </div>
+                    </div>
+                    ${proCta('Unlock with Pro →', { className: 'btn-primary' })}
+                </div>`;
         }
     } else if (scan.stocks_scanned) {
         picksHtml = `<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">
             No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
         </td></tr>`;
+        picksCardsHtml = `<div class="pick-card-empty">No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}</div>`;
     } else {
         picksHtml = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
+        picksCardsHtml = '<div class="pick-card-empty">No recent scan data</div>';
     }
 
     // Training status section
@@ -861,7 +936,7 @@ Router.register('/daily', async () => {
 
     <div class="table-container">
         <div class="table-header">Today's Picks <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span></div>
-        <table>
+        <table class="picks-table">
             <thead>
                 <tr>
                     <th>Symbol</th><th>Rec</th><th>Score</th>
@@ -871,6 +946,7 @@ Router.register('/daily', async () => {
             </thead>
             <tbody>${picksHtml}</tbody>
         </table>
+        <div class="picks-cards">${picksCardsHtml}</div>
     </div>`;
 });
 

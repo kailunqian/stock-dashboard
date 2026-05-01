@@ -5,14 +5,17 @@
 //   - API responses: network-first, no cache (data must be fresh).
 // Bump CACHE_VERSION any time the static shell changes shape.
 
-const CACHE_VERSION = 'sa-v7.5';
+const CACHE_VERSION = 'sa-v7.6';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
+// NOTE: js/incident-reporter.js is intentionally OMITTED from SHELL_FILES.
+// It must be network-only — a cached buggy version of the reporter would
+// silence the very alerts that would tell us it's broken.
 const SHELL_FILES = [
     './',
     './index.html',
-    './css/style.css?v=7.5',
-    './js/api.js?v=7.5',
-    './js/app.js?v=7.5',
+    './css/style.css?v=7.6',
+    './js/api.js?v=7.6',
+    './js/app.js?v=7.6',
     './manifest.json'
 ];
 
@@ -47,6 +50,13 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Never cache the incident reporter itself. A cached buggy version
+    // would silence the alerts that would tell us it's broken. Always
+    // go to network; if network is dead the page boots fine without it.
+    if (url.pathname.endsWith('/js/incident-reporter.js')) {
+        return;
+    }
+
     // Same-origin static shell: network-first, cache fallback.
     if (url.origin === self.location.origin) {
         event.respondWith(
@@ -61,4 +71,14 @@ self.addEventListener('fetch', (event) => {
                 .catch(() => caches.match(req).then(c => c || caches.match('./index.html')))
         );
     }
+});
+
+// Respond to the page's GET_VERSION ping from incident-reporter.js so the
+// reporter can detect cache-version drift between the page and the SW.
+self.addEventListener('message', (event) => {
+    try {
+        if (event.data && event.data.type === 'GET_VERSION' && event.ports && event.ports[0]) {
+            event.ports[0].postMessage({ cacheVersion: CACHE_VERSION });
+        }
+    } catch (_) { /* swallow */ }
 });

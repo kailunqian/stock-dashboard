@@ -20,8 +20,41 @@
     <!-- Inter font (Linear-style typography) — non-blocking, system fallback acceptable -->
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
-    <link rel="stylesheet" href="css/style.css?v=7.5">
+    <link rel="stylesheet" href="css/style.css?v=7.6">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
+
+    <!-- Emergency service-worker reset. Visit ?reset-sw=1 to nuke all
+         caches + unregister SWs (use when a stale cached shell breaks the
+         page so badly the user can't even reach Settings to do it manually).
+         Runs synchronously in <head> so it kicks in BEFORE any other script
+         can re-register the SW. -->
+    <script>
+    (function () {
+        try {
+            if (location.search.indexOf('reset-sw=1') === -1) return;
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    regs.forEach(function (r) { try { r.unregister(); } catch (_) {} });
+                }).catch(function () {});
+            }
+            if (window.caches && caches.keys) {
+                caches.keys().then(function (keys) {
+                    keys.forEach(function (k) { try { caches.delete(k); } catch (_) {} });
+                }).catch(function () {});
+            }
+            // Strip the flag and reload after a short delay so the cleanup
+            // promises actually settle before we re-fetch the shell.
+            setTimeout(function () {
+                location.replace(location.pathname + location.hash);
+            }, 400);
+        } catch (_) {}
+    })();
+    </script>
+
+    <!-- Incident reporter — load FIRST so window.onerror is hooked before
+         any other script can throw. Excluded from SW SHELL_FILES so it's
+         always network-only (a cached bad version would silence reports). -->
+    <script src="js/incident-reporter.js?v=7.6"></script>
 </head>
 <body>
     <!-- Top navigation -->
@@ -92,8 +125,8 @@
         <a href="#/diagnostics" data-route="/diagnostics" data-admin-only aria-label="Diagnostics"><span class="icon" aria-hidden="true">🔬</span><span>Diag</span></a>
     </nav>
 
-    <script src="js/api.js?v=7.5"></script>
-    <script src="js/app.js?v=7.5"></script>
+    <script src="js/api.js?v=7.6"></script>
+    <script src="js/app.js?v=7.6"></script>
     <script>
         // PWA service worker — best-effort, fails silently on http://localhost
         if ('serviceWorker' in navigator) {

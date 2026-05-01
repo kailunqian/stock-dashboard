@@ -135,14 +135,33 @@ const API = {
     // idempotent — creates a free user row if missing, sends a magic link
     // either way. Replaces legacy /api/dashboard/auth/login (allowlist-only).
     async login(email) {
-        const resp = await fetch(`${this.base}/api/auth/signup`, {
-            credentials: 'include',
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email }),
-        });
+        let resp;
+        try {
+            resp = await fetch(`${this.base}/api/auth/signup`, {
+                credentials: 'include',
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+        } catch (netErr) {
+            try { window.IncidentReporter && window.IncidentReporter.report({
+                kind: 'login-submit-fail',
+                function: 'API.login',
+                error_class: (netErr && netErr.name) || 'NetworkError',
+                message: 'network: ' + ((netErr && netErr.message) || 'fetch failed'),
+            }); } catch (_) {}
+            throw netErr;
+        }
         const body = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(body.error || 'Failed to send sign-in link');
+        if (!resp.ok) {
+            try { window.IncidentReporter && window.IncidentReporter.report({
+                kind: 'login-submit-fail',
+                function: 'API.login',
+                error_class: 'HTTP' + resp.status,
+                message: 'status=' + resp.status + ' err=' + (body.error || '').slice(0, 200),
+            }); } catch (_) {}
+            throw new Error(body.error || 'Failed to send sign-in link');
+        }
         return body;
     },
 
@@ -180,16 +199,45 @@ const API = {
     // verify endpoint with credentials:'include' so the browser stores the
     // dash_jwt cookie scoped to the API host.
     async verifyMagicLink(token) {
-        const resp = await fetch(
-            `${this.base}/api/auth/verify?token=${encodeURIComponent(token)}`,
-            {
-                credentials: 'include',
-                method: 'GET',
-                headers: { 'Accept': 'application/json' },
-            },
-        );
+        // Drop a sentinel BEFORE the round-trip. If verify succeeds and we
+        // reload, app.js boot reads this on the next page load — if
+        // checkAuth() then fails, we know we hit a "verify-then-bounce"
+        // failure mode (cookie blocked, token race, etc.) which would
+        // otherwise be silent.
+        try {
+            sessionStorage.setItem('pending_magic_verify',
+                JSON.stringify({ ts: Date.now() }));
+        } catch (_) {}
+
+        let resp;
+        try {
+            resp = await fetch(
+                `${this.base}/api/auth/verify?token=${encodeURIComponent(token)}`,
+                {
+                    credentials: 'include',
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                },
+            );
+        } catch (netErr) {
+            try { window.IncidentReporter && window.IncidentReporter.report({
+                kind: 'verify-fail',
+                function: 'API.verifyMagicLink',
+                error_class: (netErr && netErr.name) || 'NetworkError',
+                message: 'network: ' + ((netErr && netErr.message) || 'fetch failed'),
+            }); } catch (_) {}
+            try { sessionStorage.removeItem('pending_magic_verify'); } catch (_) {}
+            throw netErr;
+        }
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok || !body.ok) {
+            try { window.IncidentReporter && window.IncidentReporter.report({
+                kind: 'verify-fail',
+                function: 'API.verifyMagicLink',
+                error_class: 'HTTP' + resp.status,
+                message: 'status=' + resp.status + ' err=' + (body.error || 'invalid_or_expired').slice(0, 200),
+            }); } catch (_) {}
+            try { sessionStorage.removeItem('pending_magic_verify'); } catch (_) {}
             throw new Error(body.error || 'invalid_or_expired');
         }
         // Bust the auth cache so the next checkAuth() actually round-trips.
@@ -313,17 +361,35 @@ const API = {
         if (this._authCache && this._authCache.expires > now) {
             return this._authCache.result;
         }
+        let resp;
         try {
-            const resp = await fetch(`${this.base}/api/dashboard/auth/me`, {
+            resp = await fetch(`${this.base}/api/dashboard/auth/me`, {
                 credentials: 'include',
                 headers: this.headers(),
             });
-            const result = resp.ok ? await resp.json() : { authenticated: false };
+        } catch (netErr) {
+            // Categorize the failure so the auth-bounce report (if any)
+            // tells us *why* the post-verify check failed, not just that
+            // it did. CORS, network drop, and TypeError land here.
+            const isCors = /CORS|cross[- ]origin/i.test(String(netErr && netErr.message));
+            return { authenticated: false, reason: isCors ? 'cors' : 'network',
+                     _err: String((netErr && netErr.message) || netErr).slice(0, 200) };
+        }
+        if (resp.ok) {
+            let result;
+            try { result = await resp.json(); }
+            catch (parseErr) {
+                return { authenticated: false, reason: 'parse',
+                         _err: String((parseErr && parseErr.message) || parseErr).slice(0, 200) };
+            }
             this._authCache = { result, expires: now + this.AUTH_TTL_MS };
             return result;
-        } catch {
-            return { authenticated: false };
         }
+        // Non-2xx: distinguish 401 (truly logged out) from 5xx (backend down).
+        const reason = resp.status === 401 ? 'auth_me_401'
+                     : resp.status >= 500   ? 'auth_me_5xx'
+                     : 'auth_me_' + resp.status;
+        return { authenticated: false, reason: reason };
     },
 
     async logout() {
