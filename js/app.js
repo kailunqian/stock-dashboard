@@ -1832,6 +1832,21 @@ Router.register('/system', async () => {
     const test = data.self_test || {};
     const training = data.training || {};
     const phaseE = data.phase_e_verdict || null;
+    const dataHealth = data.data_health || {};
+
+    const dhTracked = dataHealth.tracked_symbols || 0;
+    const dhCands = dataHealth.candidates || 0;
+    const dhFastSkip = dataHealth.fast_skip_active || 0;
+    const dhClass = dhCands > 0 ? 'negative' : (dhTracked > 0 ? 'positive' : 'neutral');
+    const dataHealthHtml = `
+        <div class="card">
+            <div class="card-title">Data Health</div>
+            <div class="card-value ${dhClass}">${dhCands}</div>
+            <div class="card-subtitle" style="margin-top:8px">Likely-delisted candidates</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Tracked: ${dhTracked} symbols</div>
+            <div style="font-size:13px;color:var(--text-secondary)">Fast-skip active: ${dhFastSkip}</div>
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Per-worker sample · candidates filed as incidents</div>
+        </div>`;
 
     const sources = [];
     if (model.has_llm) sources.push('LLM');
@@ -1882,6 +1897,7 @@ Router.register('/system', async () => {
             <div style="font-size:12px;color:var(--text-secondary);margin-top:6px;font-style:italic">${phaseE.recommendation || ''}</div>
         </div>` : ''}
         ${jobsSummaryHtml}
+        ${dataHealthHtml}
     </div>
 
     <div class="table-container">
