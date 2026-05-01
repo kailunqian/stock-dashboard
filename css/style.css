@@ -37,6 +37,7 @@
     --accent-blue: var(--info);
     --accent-yellow: var(--warning);
     --accent-purple: var(--accent);
+    --accent-teal: #14B8A6;
     --green: var(--success);
     --green-bg: var(--success-bg);
     --yellow: var(--warning);
@@ -655,6 +656,7 @@ tr:last-child td { border-bottom: none; }
 .weight-bar-fill.fundamental { background: var(--accent-green); }
 .weight-bar-fill.momentum { background: var(--accent-purple); }
 .weight-bar-fill.news { background: var(--accent-yellow); }
+.weight-bar-fill.strategy { background: var(--accent-teal); }
 .weight-bar-fill.ml { background: var(--accent-red); }
 
 /* Login page — Linear/Vercel-inspired minimal */
