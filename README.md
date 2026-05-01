@@ -75,3 +75,23 @@ Email → Azure Functions (send magic link) → User clicks link → Verify toke
 - **Login page** — glassmorphism card with gradient accent, SVG icons (no emoji)
 - **Read-only dashboard** — all data comes from scheduled cloud functions
 - **Self-healing** — auto-retry with known-fix patterns on function failures
+
+
+## Development
+
+### Cache-bust versioning
+
+The service worker (`sw.js`) caches shell files keyed by `CACHE_VERSION`.
+`index.html` and `sw.js` SHELL_FILES must reference the same `?v=` so the
+SW invalidates the cache on deploy. CI guards against drift.
+
+To bump the cache version:
+
+1. Edit `CACHE_VERSION` in `sw.js` (e.g. `sa-v7.4`).
+2. Run `node scripts/sync-cache-bust.mjs` to sync `?v=` everywhere.
+
+To enable a local pre-push check (recommended):
+
+```bash
+git config core.hooksPath .githooks
+```

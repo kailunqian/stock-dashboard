@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Stop cache-bust drift from reaching CI (and your inbox).
+# Enable once with: git config core.hooksPath .githooks
+set -e
+
+if command -v node >/dev/null 2>&1; then
+    node scripts/sync-cache-bust.mjs --check
+    node tests/regression-guards.mjs
+else
+    echo "⚠️  node not found on PATH — skipping pre-push regression guards." >&2
+fi
