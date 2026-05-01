@@ -5,7 +5,7 @@
 //   - API responses: network-first, no cache (data must be fresh).
 // Bump CACHE_VERSION any time the static shell changes shape.
 
-const CACHE_VERSION = 'sa-v7.10';
+const CACHE_VERSION = 'sa-v7.11';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 // NOTE: js/incident-reporter.js is intentionally OMITTED from SHELL_FILES.
 // It must be network-only — a cached buggy version of the reporter would
@@ -13,9 +13,9 @@ const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const SHELL_FILES = [
     './',
     './index.html',
-    './css/style.css?v=7.10',
-    './js/api.js?v=7.10',
-    './js/app.js?v=7.10',
+    './css/style.css?v=7.11',
+    './js/api.js?v=7.11',
+    './js/app.js?v=7.11',
     './manifest.json'
 ];
 

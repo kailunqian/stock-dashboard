@@ -583,7 +583,9 @@ tr:last-child td { border-bottom: none; }
 .flow-pipeline {
     display: flex;
     align-items: stretch;
-    gap: 8px;
+    /* 28px gap = enough room for the ::after arrow (centered between cards)
+       so it doesn't get clipped or painted over by the next .flow-stage. */
+    gap: 28px;
     overflow-x: auto;
     padding: 8px 0;
 }
@@ -602,11 +604,16 @@ tr:last-child td { border-bottom: none; }
 .flow-stage::after {
     content: '→';
     position: absolute;
-    right: -14px;
+    /* Center the arrow in the 28px gap (≈half-gap minus half-glyph). */
+    right: -20px;
     top: 50%;
     transform: translateY(-50%);
     color: var(--text-secondary);
     font-size: 16px;
+    /* Sit above the next card so its background can't paint over us, and
+       stay click-through so it never steals pointer events. */
+    z-index: 1;
+    pointer-events: none;
 }
 
 .flow-stage:last-child::after { content: ''; }
