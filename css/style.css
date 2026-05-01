@@ -583,40 +583,71 @@ tr:last-child td { border-bottom: none; }
 .flow-pipeline {
     display: flex;
     align-items: stretch;
-    /* 28px gap = enough room for the ::after arrow (centered between cards)
-       so it doesn't get clipped or painted over by the next .flow-stage. */
-    gap: 28px;
+    /* No outer gap — the inline .flow-connector elements own the spacing. */
+    gap: 0;
     overflow-x: auto;
     padding: 8px 0;
+    /* Subtle horizontal track behind cards & connectors so the eye reads
+       a single pipeline rather than disconnected boxes (Linear/Stripe-style). */
+    position: relative;
+}
+
+.flow-pipeline::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    right: 16px;
+    top: 50%;
+    height: 1px;
+    background: var(--border);
+    z-index: 0;
+    pointer-events: none;
 }
 
 .flow-stage {
-    flex: 1;
+    flex: 1 1 0;
     min-width: 140px;
     background: var(--bg-secondary);
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 14px;
     text-align: center;
+    /* Stack above the connector track. */
     position: relative;
-}
-
-.flow-stage::after {
-    content: '→';
-    position: absolute;
-    /* Center the arrow in the 28px gap (≈half-gap minus half-glyph). */
-    right: -20px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-secondary);
-    font-size: 16px;
-    /* Sit above the next card so its background can't paint over us, and
-       stay click-through so it never steals pointer events. */
     z-index: 1;
-    pointer-events: none;
 }
 
-.flow-stage:last-child::after { content: ''; }
+/* Connector lives BETWEEN cards as a real flex child — no absolute
+   positioning, no negative offsets, no escaping into adjacent cards.
+   The chevron is drawn from two borders so it stays crisp at any DPR. */
+.flow-connector {
+    flex: 0 0 28px;
+    align-self: center;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+}
+
+.flow-connector::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-right: 1.5px solid var(--text-secondary);
+    border-top: 1.5px solid var(--text-secondary);
+    transform: rotate(45deg) translate(-1px, 1px);
+    opacity: 0.85;
+}
+
+/* The trailing connector after the last stage carries no meaning — drop it. */
+.flow-stage:last-of-type ~ .flow-connector,
+.flow-pipeline > .flow-connector:last-child {
+    display: none;
+}
+
+.flow-stage:last-child::after { content: none; }
 
 .flow-stage-label {
     font-size: 11px;

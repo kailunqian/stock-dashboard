@@ -1712,6 +1712,7 @@ async function renderStockDetail(symbol) {
             <div class="flow-stage-value">${s.value || '—'}</div>
             <div class="flow-stage-detail">Weight: ${((s.weight || 0) * 100).toFixed(0)}%</div>
         </div>
+        <div class="flow-connector" aria-hidden="true"></div>
     `).join('');
 
     const weightBars = stages.map(s => `
