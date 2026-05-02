@@ -231,14 +231,24 @@ const API = {
         }
         const body = await resp.json().catch(() => ({}));
         if (!resp.ok || !body.ok) {
-            try { window.IncidentReporter && window.IncidentReporter.report({
-                kind: 'verify-fail',
-                function: 'API.verifyMagicLink',
-                error_class: 'HTTP' + resp.status,
-                message: 'status=' + resp.status + ' err=' + (body.error || 'invalid_or_expired').slice(0, 200),
-            }); } catch (_) {}
+            // Suppress incident reports for `invalid_or_expired` — that's the
+            // *expected* server response when a user clicks a stale or
+            // already-consumed magic link. Reporting every such click as
+            // an incident generates false-alarm noise in the feed and
+            // crowds out genuine verify failures (server bugs, CORS issues,
+            // 5xx outages). Real failures still fire the incident below.
+            const errCode = (body.error || 'invalid_or_expired');
+            const isExpectedUserError = (resp.status === 400 && errCode === 'invalid_or_expired');
+            if (!isExpectedUserError) {
+                try { window.IncidentReporter && window.IncidentReporter.report({
+                    kind: 'verify-fail',
+                    function: 'API.verifyMagicLink',
+                    error_class: 'HTTP' + resp.status,
+                    message: 'status=' + resp.status + ' err=' + errCode.slice(0, 200),
+                }); } catch (_) {}
+            }
             try { sessionStorage.removeItem('pending_magic_verify'); } catch (_) {}
-            throw new Error(body.error || 'invalid_or_expired');
+            throw new Error(errCode);
         }
         // Bust the auth cache so the next checkAuth() actually round-trips.
         this._authCache = null;
