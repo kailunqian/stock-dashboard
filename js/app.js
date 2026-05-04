@@ -412,6 +412,101 @@ function timeSince(iso) {
     return `${Math.floor(diff/86400)}d ago`;
 }
 
+// ── PT-localized schedule helpers (Pacific Time / America/Los_Angeles) ──
+// Backend cron strings are 6-field Azure cron in UTC. The dashboard owner
+// reads them in Pacific Time, so we render schedule + last-run + next-run
+// times with a DST-aware formatter. Raw UTC cron is preserved as a tooltip
+// so power users can still see the source-of-truth string.
+function _formatPTClock(utcHour, utcMin = 0) {
+    const now = new Date();
+    const probe = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcHour, utcMin, 0));
+    return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric', minute: '2-digit', hour12: true,
+    }).format(probe);
+}
+function _ordinal(n) {
+    const s = ['th','st','nd','rd'], v = n % 100;
+    return n + (s[(v-20)%10] || s[v] || s[0]);
+}
+function formatCronPT(cron) {
+    if (!cron || typeof cron !== 'string') return cron || '—';
+    const parts = cron.trim().split(/\s+/);
+    let f;
+    if (parts.length === 6) f = parts.slice(1);   // Azure 6-field → drop seconds
+    else if (parts.length === 5) f = parts;
+    else return cron;                             // unknown shape → raw
+    const [minF, hourF, domF, monF, dowF] = f;
+    const dowMap = {
+        '*': '', '1-5': 'Weekdays', '0,6': 'Weekends', '6,0': 'Weekends',
+        '0': 'Sundays', '1': 'Mondays', '2': 'Tuesdays', '3': 'Wednesdays',
+        '4': 'Thursdays', '5': 'Fridays', '6': 'Saturdays',
+    };
+    const dowLabel = dowMap[dowF] ?? dowF;
+
+    // every-N-min patterns
+    const everyMin = /^\*\/(\d+)$/.exec(minF);
+    if (everyMin) {
+        if (hourF === '*') {
+            return dowLabel ? `Every ${everyMin[1]} min, ${dowLabel.toLowerCase()}` : `Every ${everyMin[1]} min`;
+        }
+        const rangeM = /^(\d+)-(\d+)$/.exec(hourF);
+        if (rangeM) {
+            const dow = dowLabel ? `${dowLabel.toLowerCase()} ` : '';
+            return `Every ${everyMin[1]} min, ${dow}${_formatPTClock(+rangeM[1])}–${_formatPTClock(+rangeM[2])} PT`;
+        }
+    }
+    // hourly :MM
+    if (hourF === '*' && /^\d+$/.test(minF)) {
+        return dowLabel ? `Hourly :${minF.padStart(2,'0')}, ${dowLabel.toLowerCase()}` : `Hourly :${minF.padStart(2,'0')}`;
+    }
+    // fixed minute + hour range (e.g. 0 0 14-21 * * 1-5)
+    const hourRange = /^(\d+)-(\d+)$/.exec(hourF);
+    if (/^\d+$/.test(minF) && hourRange) {
+        const lo = _formatPTClock(+hourRange[1], +minF);
+        const hi = _formatPTClock(+hourRange[2], +minF);
+        const prefix = dowLabel || 'Daily';
+        return `${prefix} hourly ${lo}–${hi} PT`;
+    }
+    // single or comma-separated specific hours, fixed minute
+    if (/^\d+$/.test(minF) && /^[\d,]+$/.test(hourF)) {
+        const hours = hourF.split(',').map(h => +h);
+        const times = hours.map(h => _formatPTClock(h, +minF));
+        if (/^\d+$/.test(domF)) {
+            return `${_ordinal(+domF)} of month, ${times.join(', ')} PT`;
+        }
+        const prefix = dowLabel || 'Daily';
+        return `${prefix} ${times.join(', ')} PT`;
+    }
+    return cron;  // complex pattern → fall back to raw
+}
+function formatPT(iso) {
+    if (!iso) return '—';
+    try {
+        const d = new Date(iso);
+        if (isNaN(d.getTime())) return '—';
+        const time = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit', hour12: true,
+        }).format(d);
+        // Compare PT calendar days (not browser-local) so "Today" is correct
+        // for users in any timezone.
+        const ptDate = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/Los_Angeles', year: 'numeric', month: '2-digit', day: '2-digit',
+        });
+        const target = ptDate.format(d);
+        const today = ptDate.format(new Date());
+        const tomorrow = ptDate.format(new Date(Date.now() + 86400000));
+        const yesterday = ptDate.format(new Date(Date.now() - 86400000));
+        if (target === today) return `Today ${time} PT`;
+        if (target === tomorrow) return `Tomorrow ${time} PT`;
+        if (target === yesterday) return `Yesterday ${time} PT`;
+        const dateStr = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Los_Angeles', month: 'short', day: 'numeric',
+        }).format(d);
+        return `${dateStr} ${time} PT`;
+    } catch { return '—'; }
+}
+
 // ── Login Page ──────────────────────────────────────────────────────
 
 Router.register('/login', async () => {
@@ -1966,24 +2061,32 @@ Router.register('/system', async () => {
             }
             const statusBadge = j.last_status ? pill(j.last_status, statusMap2[j.last_status] || 'blue') : '<span style="color:var(--text-secondary)">—</span>';
             const failBadge = failed > 0 ? ` ${pill(failed + ' failed', 'red')}` : '';
+            const lastAbs = j.last_timestamp ? formatPT(j.last_timestamp) : '';
+            const nextAbs = j.next_run ? formatPT(j.next_run) : '';
             return `
             <tr>
                 <td>
                     <strong>${j.name}</strong>${j.trading_only ? ' ' + pill('trading days', 'yellow') : ''}
                     <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${j.description}</div>
                 </td>
-                <td><code style="font-size:11px">${j.schedule}</code></td>
+                <td title="${j.schedule} UTC">${formatCronPT(j.schedule)}</td>
                 <td>${statusBadge}${failBadge}</td>
-                <td>${timeSince(j.last_timestamp)}</td>
+                <td>
+                    ${timeSince(j.last_timestamp)}
+                    ${lastAbs ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${lastAbs}</div>` : ''}
+                </td>
                 <td><span class="${ratioColor}" style="font-weight:600">${ratio}</span></td>
-                <td>${fmtNext(j.next_run)}</td>
+                <td>
+                    ${fmtNext(j.next_run)}
+                    ${nextAbs ? `<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${nextAbs}</div>` : ''}
+                </td>
             </tr>`;
         }).join('');
         return `
         <div class="table-container" style="margin-top:16px">
             <div class="table-header">${catLabel[cat] || cat}</div>
             <table>
-                <thead><tr><th>Function</th><th>Schedule (UTC)</th><th>Status</th><th>Last Run</th><th>Last 24h (ran/expected)</th><th>Next Run</th></tr></thead>
+                <thead><tr><th>Function</th><th>Schedule (PT)</th><th>Status</th><th>Last Run</th><th>Last 24h (ran/expected)</th><th>Next Run</th></tr></thead>
                 <tbody>${rows}</tbody>
             </table>
         </div>`;
