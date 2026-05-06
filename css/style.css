@@ -555,6 +555,37 @@ tr:last-child td { border-bottom: none; }
 .pill-yellow { background: var(--warning-bg); color: var(--warning); border-color: rgba(229,169,59,0.25); }
 .pill-blue   { background: rgba(91,160,242,0.12); color: var(--info); border-color: rgba(91,160,242,0.25); }
 
+/* Freshness badge — small muted indicator next to table headers
+ * showing when the underlying data was last refreshed. Distinct from
+ * `.pill` because it carries no semantic status (not red/yellow/green)
+ * and shouldn't compete visually with status pills like "5 ranked". */
+.freshness-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: var(--radius-pill);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+    cursor: default;
+}
+.freshness-badge::before {
+    content: '\1F551';
+    font-size: 10px;
+    opacity: 0.7;
+}
+.freshness-badge.is-stale {
+    color: var(--warning);
+    border-color: rgba(229,169,59,0.35);
+}
+.freshness-badge.is-stale::before { content: '\26A0\FE0F'; }
+
 /* Live/active pills get a pulsing dot */
 .pill.live::before,
 .pill-green.live::before {

@@ -507,6 +507,47 @@ function formatPT(iso) {
     } catch { return '—'; }
 }
 
+// ── Freshness badge ─────────────────────────────────────────────────
+// Small subdued badge for table headers showing when the underlying
+// data was last refreshed. Visible relative time ("2h ago"), absolute
+// PT timestamp on hover ("Today 9:14 AM PT"). Marks the badge stale
+// when the data is older than `staleAfterHrs` (default 24h, so Today's
+// Picks turns yellow if yesterday's scan never refreshed).
+//
+// Returns '' for missing/invalid timestamps so callers can safely
+// concatenate the result into existing markup without producing a
+// dangling "Updated —" pill.
+function freshnessBadge(iso, opts = {}) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const label = opts.label || 'Updated';
+    const staleAfterHrs = opts.staleAfterHrs != null ? opts.staleAfterHrs : 24;
+    const ageHrs = (Date.now() - d.getTime()) / 3600000;
+    const isStale = ageHrs > staleAfterHrs;
+    const cls = isStale ? 'freshness-badge is-stale' : 'freshness-badge';
+    // Title attribute = absolute PT time, visible on hover. Escape the
+    // double-quote that formatPT will never emit but defend in depth.
+    const abs = String(formatPT(iso)).replace(/"/g, '&quot;');
+    return `<span class="${cls}" title="${abs}">${label} ${timeSince(iso)}</span>`;
+}
+
+// Find the most-recent ISO timestamp in a list of objects, e.g.
+// _maxIso([{last_seen: '...'}, ...], 'last_seen'). Returns null when
+// every entry is missing/unparseable so callers can decide on a
+// fallback (e.g. the page-render time).
+function _maxIso(items, key) {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    let max = -Infinity, found = null;
+    for (const it of items) {
+        const raw = it && it[key];
+        if (!raw) continue;
+        const ms = new Date(raw).getTime();
+        if (!isNaN(ms) && ms > max) { max = ms; found = raw; }
+    }
+    return found;
+}
+
 // ── Login Page ──────────────────────────────────────────────────────
 
 Router.register('/login', async () => {
@@ -1030,7 +1071,11 @@ Router.register('/daily', async () => {
     </div>
 
     <div class="table-container">
-        <div class="table-header">Today's Picks <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span></div>
+        <div class="table-header" style="display:flex;align-items:center;gap:10px">
+            Today's Picks
+            <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span>
+            ${freshnessBadge(scan.scanned_at, { label: 'Scan' })}
+        </div>
         <table class="picks-table">
             <thead>
                 <tr>
@@ -1999,7 +2044,11 @@ Router.register('/system', async () => {
         return `
         ${open.length ? `
         <div class="table-container" style="border:2px solid var(--negative); margin-top:8px">
-            <div class="table-header" style="color:var(--negative)">🚨 Open Incidents (${open.length})</div>
+            <div class="table-header" style="color:var(--negative);display:flex;align-items:center;gap:10px">
+                <span>🚨 Open Incidents (${open.length})</span>
+                <span style="margin-left:auto"></span>
+                ${freshnessBadge(_maxIso(open, 'last_seen'), { label: 'Last incident' })}
+            </div>
             <table>
                 <thead><tr><th>Function / Class</th><th>Error</th><th>Count</th><th>First Seen</th><th>Last Seen</th><th></th></tr></thead>
                 <tbody>${openRows}</tbody>
@@ -2007,7 +2056,11 @@ Router.register('/system', async () => {
         </div>` : ''}
         ${resolved.length ? `
         <div class="table-container" style="margin-top:16px">
-            <div class="table-header">Recently Auto-Resolved (last 7d)</div>
+            <div class="table-header" style="display:flex;align-items:center;gap:10px">
+                <span>Recently Auto-Resolved (last 7d)</span>
+                <span style="margin-left:auto"></span>
+                ${freshnessBadge(_maxIso(resolved, 'resolved_at'), { label: 'Last resolved', staleAfterHrs: 7 * 24 })}
+            </div>
             <table>
                 <thead><tr><th>Function / Class</th><th>Error</th><th>Status</th><th>Resolved</th></tr></thead>
                 <tbody>${resRows}</tbody>
@@ -2175,7 +2228,11 @@ Router.register('/system', async () => {
     </div>
 
     <div class="table-container">
-        <div class="table-header">Function Status (recent)</div>
+        <div class="table-header" style="display:flex;align-items:center;gap:10px">
+            <span>Function Status (recent)</span>
+            <span style="margin-left:auto"></span>
+            ${freshnessBadge(_maxIso(data.functions || [], 'timestamp'), { label: 'Last run' })}
+        </div>
         <table>
             <thead><tr><th>Function</th><th>Status</th><th>Last Run</th></tr></thead>
             <tbody>${functionsHtml || '<tr><td colspan="3" style="text-align:center">No data</td></tr>'}</tbody>
