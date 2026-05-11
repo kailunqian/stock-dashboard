@@ -1727,12 +1727,16 @@ function renderPerformanceCharts(metrics) {
         }});
     }
 
-    // Chart 4: Cumulative Portfolio
+    // Chart 4: Equal-weight portfolio average pick return (rolling 30 days).
+    // Backend metric `portfolio_cumulative_30d` is the AVERAGE 7d return of
+    // picks made in the trailing 30 days — i.e. the equal-weight portfolio
+    // return. Previously labeled "Cumulative" but stored sum-of-returns,
+    // which produced nonsense like 140%.
     if (metrics.portfolio_cumulative_30d) {
-        const canvas4 = createChartCanvas('cumulative-chart', 'Cumulative 30-Day Return (%)', chartSection);
+        const canvas4 = createChartCanvas('cumulative-chart', 'Avg 7d Pick Return — Last 30 Days (%)', chartSection);
         new Chart(canvas4, { type: 'line', data: {
             datasets: [{
-                label: 'Cumulative Return', data: metrics.portfolio_cumulative_30d.map(d => ({ x: d.date, y: d.value })),
+                label: 'Avg Return', data: metrics.portfolio_cumulative_30d.map(d => ({ x: d.date, y: d.value })),
                 borderColor: '#bc8cff', backgroundColor: 'rgba(188,140,255,0.1)', fill: true, tension: 0.3, pointRadius: 4
             }]
         }, options: commonOptions });
