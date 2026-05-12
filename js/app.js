@@ -1070,24 +1070,156 @@ Router.register('/daily', async () => {
         ${trainingHtml}
     </div>
 
-    <div class="table-container">
-        <div class="table-header" style="display:flex;align-items:center;gap:10px">
-            Today's Picks
-            <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span>
-            ${freshnessBadge(scan.scanned_at, { label: 'Scan' })}
+    // ── Action panel: Buy / Keep / Sell from rolling multi-day signals ──
+    // Assumed portfolio = symbols the system flagged as Buy on prior days
+    // (actionable_count >= 1 in the conviction tracker).
+    // Today's top_picks are the freshest single-day Buy signals.
+    //   - in today's picks AND not previously a Buy → 🛒 BUY (new entry)
+    //   - in today's picks AND previously a Buy      → ✅ KEEP (reaffirmed)
+    //   - previously a Buy AND now weakened          → ⚠️ TRIM/SELL
+    const conviction = data.conviction || [];
+    const todayPickSyms = new Set((scan.top_picks || []).map(p => p.symbol));
+    const convBySym = {};
+    for (const c of conviction) convBySym[c.symbol] = c;
+
+    const buyList = [];
+    const keepList = [];
+    const sellList = [];
+    for (const p of (scan.top_picks || [])) {
+        const c = convBySym[p.symbol] || {};
+        const wasBuy = (c.actionable_count || 0) >= 1;
+        (wasBuy ? keepList : buyList).push({ pick: p, conv: c });
+    }
+    for (const c of conviction) {
+        if (todayPickSyms.has(c.symbol)) continue;
+        const wasBuy = (c.actionable_count || 0) >= 1;
+        const weakened = (c.latest_score || 0) < 70 || c.trend === 'down';
+        if (wasBuy && weakened) sellList.push(c);
+    }
+
+    const trendIcon = t => t === 'up' ? '📈' : t === 'down' ? '📉' : '➡️';
+
+    function actionRow(item, kind) {
+        const p = item.pick || {};
+        const c = item.conv || item || {};
+        const sym = p.symbol || c.symbol;
+        const score = Math.round(p.score || c.latest_score || 0);
+        const ringClass = score >= 85 ? 'success' : score >= 70 ? '' : 'danger';
+        const ring = `<div class="score-ring ${ringClass}" style="--score:${score};--size:36px"><span>${score}</span></div>`;
+        const days = c.actionable_count != null ? `${c.actionable_count}/${c.appearances || '?'} days` : '—';
+        const trend = c.trend ? `${trendIcon(c.trend)} ${c.trend}` : '—';
+        const entry = p.buy_price ? `$${p.buy_price.toFixed(2)}` : (p.current_price ? `$${p.current_price.toFixed(2)}` : '—');
+        const target = p.target_short ? `$${p.target_short.toFixed(2)}` : '—';
+        const stop = p.stop_loss ? `$${p.stop_loss.toFixed(2)}` : '—';
+        const note = kind === 'buy' ? 'New entry' : kind === 'keep' ? 'Reaffirmed today' : 'Weakened';
+        return `<tr onclick="window.location.hash='#/stock/${sym}'" style="cursor:pointer">
+            <td><strong>${sym}</strong></td>
+            <td>${ring}</td>
+            <td>${trend}</td>
+            <td>${days}</td>
+            <td class="hide-mobile">${entry}</td>
+            <td class="hide-mobile">${target}</td>
+            <td class="hide-mobile">${stop}</td>
+            <td style="color:var(--text-secondary);font-size:13px">${note}</td>
+        </tr>`;
+    }
+
+    function actionSection(title, list, kind, emptyMsg, color) {
+        const rows = list.length === 0
+            ? `<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:14px">${emptyMsg}</td></tr>`
+            : list.map(it => actionRow(it, kind)).join('');
+        return `
+        <div class="table-container" style="margin-bottom:18px">
+            <div class="table-header" style="display:flex;align-items:center;gap:10px">
+                <span style="color:${color};font-weight:600">${title}</span>
+                <span class="pill pill-blue" style="margin-left:auto">${list.length}</span>
+            </div>
+            <table class="picks-table">
+                <thead><tr>
+                    <th>Symbol</th><th>Score</th><th>Trend</th><th>Buy days</th>
+                    <th class="hide-mobile">Entry</th><th class="hide-mobile">Target</th><th class="hide-mobile">Stop</th>
+                    <th>Status</th>
+                </tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </div>`;
+    }
+
+    const actionPanelHtml = `
+    <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 10px">
+        <div style="font-size:18px;font-weight:600">Actions for today</div>
+        <div style="color:var(--text-secondary);font-size:13px">Based on rolling signals from the last several scans</div>
+    </div>
+    ${actionSection('🛒 BUY — new entries', buyList, 'buy', 'No new buys today', 'var(--accent-green, #22c55e)')}
+    ${actionSection('✅ KEEP — still strong (assumed held from prior buys)', keepList, 'keep', 'Nothing previously bought is in today\'s picks', 'var(--accent-blue, #60a5fa)')}
+    ${actionSection('⚠️ TRIM/SELL — previously bought, now weakened', sellList, 'sell', 'No previously-bought stocks have weakened', 'var(--accent-yellow, #f59e0b)')}
+    <p style="color:var(--text-secondary);font-size:12px;margin:-8px 0 18px">
+        Assumed portfolio = stocks the system marked as Buy on prior days. Not financial advice.
+    </p>`;
+
+    return `
+    <div class="hero">
+        <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
+    </div>
+
+    ${limitedBanner}
+    ${regimeBanner}
+
+    <div class="card-grid">
+        <div class="card featured" data-tier="strong-buy">
+            <div class="card-header">
+                <div class="card-title">🔥 Strong Buy</div>
+                ${strongBuyCount > 0 ? '<span class="pill pill-green live">live</span>' : ''}
+            </div>
+            <div class="card-value positive">${strongBuyCount}</div>
+            <div class="card-subtitle">Score ≥ 85, no risks</div>
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:6px">${scan.actionable || 0} actionable total (≥70)</div>
         </div>
-        <table class="picks-table">
-            <thead>
-                <tr>
-                    <th>Symbol</th><th>Rec</th><th>Score</th>
-                    <th>Entry</th><th>Target</th><th>Stop</th><th class="hide-mobile">Size</th>
-                    <th>Key Signal</th>
-                </tr>
-            </thead>
-            <tbody>${picksHtml}</tbody>
-        </table>
-        <div class="picks-cards">${picksCardsHtml}</div>
-    </div>`;
+        <div class="card">
+            <div class="card-header"><div class="card-title">Stocks Scanned</div></div>
+            <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
+            <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
+            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Top Pick</div>
+                ${scan.top_score ? `<div class="score-ring success" style="--score:${Math.round(scan.top_score)};--size:48px"><span>${scan.top_score.toFixed(0)}</span></div>` : ''}
+            </div>
+            <div class="card-value neutral">${scan.top_pick || '—'}</div>
+            <div class="card-subtitle">Highest composite score today</div>
+        </div>
+        <div class="card">
+            <div class="card-header"><div class="card-title">ML Model</div></div>
+            <div class="card-value code">${model.version || training.model_version || '—'}</div>
+            <div class="card-subtitle" style="margin-top:8px">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
+        </div>
+        ${trainingHtml}
+    </div>
+
+    ${actionPanelHtml}
+
+    <details style="margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--card-bg)">
+        <summary style="cursor:pointer;font-size:14px;color:var(--text-secondary)">▸ Today's full scan snapshot (single-day, raw)</summary>
+        <div class="table-container" style="margin-top:12px">
+            <div class="table-header" style="display:flex;align-items:center;gap:10px">
+                Today's Picks
+                <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span>
+                ${freshnessBadge(scan.scanned_at, { label: 'Scan' })}
+            </div>
+            <table class="picks-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th><th>Rec</th><th>Score</th>
+                        <th>Entry</th><th>Target</th><th>Stop</th><th class="hide-mobile">Size</th>
+                        <th>Key Signal</th>
+                    </tr>
+                </thead>
+                <tbody>${picksHtml}</tbody>
+            </table>
+            <div class="picks-cards">${picksCardsHtml}</div>
+        </div>
+    </details>`;
 });
 
 // ── Pipeline Page ───────────────────────────────────────────────────
@@ -1580,27 +1712,125 @@ Router.register('/performance', async () => {
         </div>`;
     }
 
+    // ── Headline KPI strip (the answer to "did the picks work?") ────────
+    function headlineKpiCard(label, c) {
+        if (!c || !c.total_picks) {
+            return `
+            <div class="card">
+                <div class="card-title">${label}</div>
+                <div class="card-value">—</div>
+                <div class="card-subtitle" style="color:var(--text-secondary)">No settled picks yet</div>
+            </div>`;
+        }
+        const hr = c.hit_rate || 0;
+        const cls = hr >= 0.5 ? 'positive' : 'negative';
+        const icon = hr >= 0.5 ? '🟢' : '🔴';
+        return `
+        <div class="card">
+            <div class="card-title">${label}</div>
+            <div class="card-value ${cls}">${(hr * 100).toFixed(0)}% win</div>
+            <div class="card-subtitle">${icon} ${c.winners}W / ${c.losers}L · ${c.total_picks} picks</div>
+            <div style="margin-top:6px;font-size:13px;color:var(--text-secondary)">
+                Avg return: <span class="${pctClass(c.avg_return)}">${pctSign(c.avg_return)}</span>
+            </div>
+        </div>`;
+    }
+    const headlineKpiHtml = `
+    <div style="font-size:14px;color:var(--text-secondary);margin:0 0 8px">Track record</div>
+    <div class="card-grid" style="margin-bottom:18px">
+        ${headlineKpiCard('Last 7 days',  sc['7d'])}
+        ${headlineKpiCard('Last 30 days', sc['30d'])}
+        ${headlineKpiCard('All time',     sc.all)}
+    </div>`;
+
+    // ── Daily Picks timeline (the main content) ─────────────────────────
+    let dailyTimelineHtml = '';
+    {
+        const recentPicks = data.recent_picks || [];
+        if (recentPicks.length > 0) {
+            // Group by date, then keep only the top-K by score per day so each
+            // row reflects the actual top picks shown that day — not every
+            // stock that briefly crossed score 75 (the raw API includes ~50
+            // rows ≥75/30d which dilutes the per-day signal).
+            const PER_DAY_LIMIT = 5;
+            const byDate = {};
+            for (const p of recentPicks) {
+                const d = p.signal_date || 'unknown';
+                if (!byDate[d]) byDate[d] = [];
+                byDate[d].push(p);
+            }
+            for (const d in byDate) {
+                byDate[d].sort((a, b) => (b.score || 0) - (a.score || 0));
+                byDate[d] = byDate[d].slice(0, PER_DAY_LIMIT);
+            }
+            const dates = Object.keys(byDate).sort().reverse();
+            const dayRows = dates.map(date => {
+                const picks = byDate[date];
+                const tickers = picks.map(p => p.symbol).join(', ');
+                const r7Vals = picks.map(p => p.return_7d).filter(v => v != null);
+                const avgR7 = r7Vals.length ? r7Vals.reduce((a, b) => a + b, 0) / r7Vals.length : null;
+                const wins = picks.filter(p => p.hit === true).length;
+                const losses = picks.filter(p => p.hit === false).length;
+                const pendingN = picks.filter(p => p.hit == null).length;
+                const settled = wins + losses;
+                const winRate = settled > 0 ? wins / settled : null;
+                const winRateText = winRate != null ? `${(winRate * 100).toFixed(0)}% (${wins}/${settled})` : `⏳ pending`;
+                const dLabel = date !== 'unknown'
+                    ? new Date(date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+                    : 'unknown';
+                const truncTickers = tickers.length > 60 ? tickers.slice(0, 57) + '…' : tickers;
+
+                const detailRows = picks.map(p => {
+                    const resultIcon = p.hit === true ? '✅' : p.hit === false ? '❌' : '⏳';
+                    return `<tr>
+                        <td><a href="#/stock/${p.symbol}" style="color:var(--accent-blue)">${p.symbol}</a></td>
+                        <td>${p.score?.toFixed(0) || '—'}</td>
+                        <td>$${p.entry_price?.toFixed(2) || '—'}</td>
+                        <td class="${pctClass(p.return_1d || 0)}">${p.return_1d != null ? pctSign(p.return_1d) : '—'}</td>
+                        <td class="${pctClass(p.return_7d || 0)}">${p.return_7d != null ? pctSign(p.return_7d) : '—'}</td>
+                        <td class="${pctClass(p.return_30d || 0)}">${p.return_30d != null ? pctSign(p.return_30d) : '—'}</td>
+                        <td>${resultIcon}</td>
+                    </tr>`;
+                }).join('');
+
+                return `
+                <details class="day-row" style="background:var(--card-bg);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;padding:0">
+                    <summary style="list-style:none;cursor:pointer;padding:12px 14px;display:grid;grid-template-columns:minmax(110px,140px) 70px 1fr minmax(90px,110px) minmax(90px,110px) 18px;gap:12px;align-items:center;font-size:14px">
+                        <span style="font-weight:600">${dLabel}</span>
+                        <span style="color:var(--text-secondary)">${picks.length} pick${picks.length !== 1 ? 's' : ''}</span>
+                        <span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${tickers}">${truncTickers}</span>
+                        <span class="${avgR7 != null ? pctClass(avgR7) : ''}">Avg 7d: ${avgR7 != null ? pctSign(avgR7) : '—'}</span>
+                        <span>${winRateText}</span>
+                        <span style="color:var(--text-secondary)">▸</span>
+                    </summary>
+                    <div style="padding:0 14px 12px;border-top:1px solid var(--border)">
+                        <div class="table-container" style="margin-top:8px">
+                            <table>
+                                <thead><tr><th>Symbol</th><th>Score</th><th>Entry</th><th>1D</th><th>7D</th><th>30D</th><th>Result</th></tr></thead>
+                                <tbody>${detailRows}</tbody>
+                            </table>
+                        </div>
+                        ${pendingN > 0 ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:6px">⏳ ${pendingN} pick${pendingN !== 1 ? 's' : ''} still awaiting 7-day outcome</div>` : ''}
+                    </div>
+                </details>`;
+            }).join('');
+
+            dailyTimelineHtml = `
+            <div style="font-size:14px;color:var(--text-secondary);margin:0 0 8px">Daily picks tracked (top ${5} per day, last 30 days)</div>
+            <div style="margin-bottom:24px">${dayRows}</div>`;
+        } else {
+            dailyTimelineHtml = `
+            <div style="font-size:14px;color:var(--text-secondary);margin:0 0 8px">Daily picks</div>
+            <div class="card" style="text-align:center;margin-bottom:24px">
+                <p style="color:var(--text-secondary)">No picks tracked yet. After the next scan, picks will appear here grouped by day.</p>
+            </div>`;
+        }
+    }
+
     return `
     <div class="page-title">Performance</div>
-    ${modelHtml || scorerHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">ML Model Metrics</div>' : ''}
-    <div class="card-grid">
-        ${modelHtml}
-        ${scorerHtml}
-    </div>
-    ${walkForwardHtml}
-    ${signalAccuracyHtml}
-    ${convictionHtml}
-    ${recentPicksHtml}
-    ${strategyHtml}
-    ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
-    <div class="card-grid">
-        ${hasScorecardData ? `
-            ${scorecardCard('7d', sc['7d'])}
-            ${scorecardCard('30d', sc['30d'])}
-            ${scorecardCard('all', sc.all)}
-            ${calibrationHtml}
-        ` : emptyHtml}
-    </div>
+    ${headlineKpiHtml}
+    ${dailyTimelineHtml}
     <div id="performance-charts" class="charts-section">
         <h2>📈 Performance Trends</h2>
         <div class="chart-timeframe">
@@ -1608,7 +1838,30 @@ Router.register('/performance', async () => {
             <button data-days="90" class="active">90 Days</button>
             <button data-days="365">1 Year</button>
         </div>
-    </div>`;
+    </div>
+    <details style="margin-top:24px;border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card-bg)">
+        <summary style="cursor:pointer;font-size:14px;color:var(--text-secondary)">▸ Show advanced metrics (ML model, calibration, strategies, walk-forward)</summary>
+        <div style="margin-top:14px">
+            ${modelHtml || scorerHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">ML Model Metrics</div>' : ''}
+            <div class="card-grid">
+                ${modelHtml}
+                ${scorerHtml}
+            </div>
+            ${walkForwardHtml}
+            ${signalAccuracyHtml}
+            ${convictionHtml}
+            ${strategyHtml}
+            ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
+            <div class="card-grid">
+                ${hasScorecardData ? `
+                    ${scorecardCard('7d', sc['7d'])}
+                    ${scorecardCard('30d', sc['30d'])}
+                    ${scorecardCard('all', sc.all)}
+                    ${calibrationHtml}
+                ` : emptyHtml}
+            </div>
+        </div>
+    </details>`;
 });
 
 async function loadPerformanceCharts(days = 90) {
