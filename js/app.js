@@ -1030,13 +1030,19 @@ Router.register('/daily', async () => {
     const topPickSym = scan.top_pick || '—';
     const topPickScore = scan.top_score ? scan.top_score.toFixed(0) : '—';
 
-    // ── Action panel: Buy / Keep / Sell from rolling multi-day signals ──
-    // Assumed portfolio = symbols the system flagged as Buy on prior days
-    // (actionable_count >= 1 in the conviction tracker).
-    // Today's top_picks are the freshest single-day Buy signals.
-    //   - in today's picks AND not previously a Buy → 🛒 BUY (new entry)
-    //   - in today's picks AND previously a Buy      → ✅ KEEP (reaffirmed)
-    //   - previously a Buy AND now weakened          → ⚠️ TRIM/SELL
+    // ── Action panel: Buy / Keep / Watch / Sell from rolling multi-day signals ──
+    // Respects the system's tier (recommendation field) so a "Watch"-tier stock
+    // doesn't get told "BUY". Tier-to-action map:
+    //   Strong Buy / Buy / Cautious Buy / Lean Buy / Squeeze Opportunity → BUY-family
+    //   Watch                                                            → WATCH (don't enter)
+    //   Neutral / Lean Sell / Underperform / Avoid                       → skipped
+    // Cross with assumed portfolio (= symbols with actionable_count >= 1 in conviction):
+    //   BUY-family AND not previously bought → 🛒 BUY (new entry)
+    //   BUY-family AND previously bought     → ✅ KEEP (reaffirmed)
+    //   WATCH                                → 👀 WATCH (informational)
+    //   previously bought AND now weak       → ⚠️ TRIM/SELL
+    const BUY_TIERS = new Set(['Strong Buy', 'Buy', 'Cautious Buy', 'Lean Buy', 'Squeeze Opportunity']);
+    const WATCH_TIERS = new Set(['Watch']);
     const conviction = data.conviction || [];
     const todayPickSyms = new Set((scan.top_picks || []).map(p => p.symbol));
     const convBySym = {};
@@ -1044,11 +1050,18 @@ Router.register('/daily', async () => {
 
     const buyList = [];
     const keepList = [];
+    const watchList = [];
     const sellList = [];
     for (const p of (scan.top_picks || [])) {
         const c = convBySym[p.symbol] || {};
         const wasBuy = (c.actionable_count || 0) >= 1;
-        (wasBuy ? keepList : buyList).push({ pick: p, conv: c });
+        const tier = p.recommendation || '';
+        if (BUY_TIERS.has(tier)) {
+            (wasBuy ? keepList : buyList).push({ pick: p, conv: c });
+        } else if (WATCH_TIERS.has(tier)) {
+            watchList.push({ pick: p, conv: c });
+        }
+        // other tiers (Neutral/Lean Sell/Avoid) intentionally skipped — wouldn't normally appear in top_picks anyway
     }
     for (const c of conviction) {
         if (todayPickSyms.has(c.symbol)) continue;
@@ -1066,14 +1079,16 @@ Router.register('/daily', async () => {
         const score = Math.round(p.score || c.latest_score || 0);
         const ringClass = score >= 85 ? 'success' : score >= 70 ? '' : 'danger';
         const ring = `<div class="score-ring ${ringClass}" style="--score:${score};--size:36px"><span>${score}</span></div>`;
+        const tierPill = p.recommendation ? recPill(p.recommendation) : '—';
         const days = c.actionable_count != null ? `${c.actionable_count}/${c.appearances || '?'} days` : '—';
         const trend = c.trend ? `${trendIcon(c.trend)} ${c.trend}` : '—';
         const entry = p.buy_price ? `$${p.buy_price.toFixed(2)}` : (p.current_price ? `$${p.current_price.toFixed(2)}` : '—');
         const target = p.target_short ? `$${p.target_short.toFixed(2)}` : '—';
         const stop = p.stop_loss ? `$${p.stop_loss.toFixed(2)}` : '—';
-        const note = kind === 'buy' ? 'New entry' : kind === 'keep' ? 'Reaffirmed today' : 'Weakened';
+        const note = kind === 'buy' ? 'New entry' : kind === 'keep' ? 'Reaffirmed today' : kind === 'watch' ? 'Observe — do not buy yet' : 'Weakened';
         return `<tr onclick="window.location.hash='#/stock/${sym}'" style="cursor:pointer">
             <td><strong>${sym}</strong></td>
+            <td>${tierPill}</td>
             <td>${ring}</td>
             <td>${trend}</td>
             <td>${days}</td>
@@ -1086,7 +1101,7 @@ Router.register('/daily', async () => {
 
     function actionSection(title, list, kind, emptyMsg, color) {
         const rows = list.length === 0
-            ? `<tr><td colspan="8" style="text-align:center;color:var(--text-secondary);padding:14px">${emptyMsg}</td></tr>`
+            ? `<tr><td colspan="9" style="text-align:center;color:var(--text-secondary);padding:14px">${emptyMsg}</td></tr>`
             : list.map(it => actionRow(it, kind)).join('');
         return `
         <div class="table-container" style="margin-bottom:18px">
@@ -1096,7 +1111,7 @@ Router.register('/daily', async () => {
             </div>
             <table class="picks-table">
                 <thead><tr>
-                    <th>Symbol</th><th>Score</th><th>Trend</th><th>Buy days</th>
+                    <th>Symbol</th><th>Tier</th><th>Score</th><th>Trend</th><th>Buy days</th>
                     <th class="hide-mobile">Entry</th><th class="hide-mobile">Target</th><th class="hide-mobile">Stop</th>
                     <th>Status</th>
                 </tr></thead>
@@ -1108,12 +1123,14 @@ Router.register('/daily', async () => {
     const actionPanelHtml = `
     <div style="display:flex;align-items:baseline;gap:10px;margin:8px 0 10px">
         <div style="font-size:18px;font-weight:600">Actions for today</div>
-        <div style="color:var(--text-secondary);font-size:13px">Based on rolling signals from the last several scans</div>
+        <div style="color:var(--text-secondary);font-size:13px">By system tier (Strong Buy / Buy / Watch …) cross-referenced with rolling multi-day signals</div>
     </div>
-    ${actionSection('🛒 BUY — new entries', buyList, 'buy', 'No new buys today', 'var(--accent-green, #22c55e)')}
-    ${actionSection('✅ KEEP — still strong (assumed held from prior buys)', keepList, 'keep', 'Nothing previously bought is in today\'s picks', 'var(--accent-blue, #60a5fa)')}
+    ${actionSection('🛒 BUY — new entries (Strong Buy / Buy tier, not previously held)', buyList, 'buy', 'No new buys today', 'var(--accent-green, #22c55e)')}
+    ${actionSection('✅ KEEP — Buy tier reaffirmed (assumed held from prior buys)', keepList, 'keep', 'Nothing previously bought is in today\'s buy tier', 'var(--accent-blue, #60a5fa)')}
+    ${actionSection('👀 WATCH — promising but do NOT buy yet (risk-reward not justified)', watchList, 'watch', 'Nothing on watch today', 'var(--text-secondary)')}
     ${actionSection('⚠️ TRIM/SELL — previously bought, now weakened', sellList, 'sell', 'No previously-bought stocks have weakened', 'var(--accent-yellow, #f59e0b)')}
     <p style="color:var(--text-secondary);font-size:12px;margin:-8px 0 18px">
+        Tier comes from the system (score + risk gates). Watch = the score may be high but risk/reward is too thin to enter — observe only.
         Assumed portfolio = stocks the system marked as Buy on prior days. Not financial advice.
     </p>`;
 
