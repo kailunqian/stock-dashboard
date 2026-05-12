@@ -2490,8 +2490,22 @@ Router.register('/diagnostics', async () => {
                 </tr>`).join('');
         v2Section = `
         <div class="page-title" style="margin-top:32px">v2 Conviction Shadow ${enforceBadge}</div>
-        <p style="color:var(--text-secondary);margin-top:-8px;margin-bottom:16px">
-            Phase 1 conviction layer running alongside legacy scorer. <strong>v2_only</strong> = picks v2 says Buy/Strong Buy that legacy missed entirely. Last ${v2.days_window} days, replayed from stored Predictions.
+        <div style="background:rgba(168,85,247,0.08);border-left:3px solid #a855f7;padding:10px 14px;margin:0 0 12px;border-radius:4px;font-size:13px;line-height:1.5">
+            <strong style="color:#a855f7">What this is:</strong> An internal A/B comparison while we test
+            an experimental scoring algorithm (v2) in shadow mode. v2 is a stricter precision-only filter
+            (composite + catalyst + 5-pillar consensus + ML p_hit gate) that only emits Strong Buy / Buy / silent.
+            <br><br>
+            <strong style="color:#a855f7">Why it exists:</strong> To validate whether v2 finds high-quality
+            picks the legacy scorer misses, BEFORE we consider promoting it (single env flag flip
+            <code>SCORING_V2_ENFORCE=true</code>). Once enough evidence accumulates this panel can be
+            removed or replaced by an auto-graduator that flips the flag automatically.
+            <br><br>
+            <strong style="color:#a855f7">Not a track record:</strong> The Daily and Performance tabs are
+            user-facing; this panel is for tuning the scorers. v2 already shows up to users via the
+            🔥 HIGH CONVICTION section on the Daily tab when both scorers agree.
+        </div>
+        <p style="color:var(--text-secondary);margin-top:0;margin-bottom:16px">
+            <strong>v2_only</strong> = picks v2 says Buy/Strong Buy that legacy missed entirely. Last ${v2.days_window} days, replayed from stored Predictions.
         </p>
         <div class="card-grid">
             <div class="card">
