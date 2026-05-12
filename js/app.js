@@ -938,77 +938,23 @@ Router.register('/daily', async () => {
         </div>`;
     }
 
-    // Today's picks — score-ring in the score column for visual punch
-    let picksHtml = '';
-    let picksCardsHtml = '';
-    if (scan.top_picks && scan.top_picks.length > 0) {
-        picksHtml = scan.top_picks.map(p => {
-            const keySignal = (p.signals || [])[0] || '—';
-            const sc = Math.max(0, Math.min(100, Math.round(p.score || 0)));
-            const ringClass = sc >= 85 ? 'success' : sc >= 70 ? '' : 'danger';
-            const ring = `<div class="score-ring ${ringClass}" style="--score:${sc};--size:42px"><span>${sc}</span></div>`;
-            return `
-            <tr onclick="window.location.hash='#/stock/${p.symbol}'" style="cursor:pointer">
-                <td><strong>${p.symbol}</strong></td>
-                <td>${p.recommendation ? recPill(p.recommendation) : '—'}</td>
-                <td>${ring}</td>
-                <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : (p.current_price ? '$' + p.current_price.toFixed(2) : '—')}</td>
-                <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
-                <td>${p.stop_loss ? '$' + p.stop_loss.toFixed(2) : '—'}</td>
-                <td class="hide-mobile">${p.position_size ? p.position_size.position_pct + '%' : '—'}</td>
-                <td>${keySignal}</td>
-            </tr>`;
-        }).join('');
-        picksCardsHtml = scan.top_picks.map(p => pickCard(p)).join('');
-
-        // Phase 13d.3: blurred teaser rows + Unlock CTA when tier-gated
-        const lockedPicks = scan._locked_picks || [];
-        if (lockedPicks.length > 0) {
-            const lockedRows = lockedPicks.map(p => {
-                const sc = Math.max(0, Math.min(100, Math.round(p.score || 0)));
-                return `
-                <tr class="locked-row">
-                    <td><strong>${p.symbol}</strong></td>
-                    <td>${p.recommendation ? recPill(p.recommendation) : '—'}</td>
-                    <td>${sc}</td>
-                    <td>${p.buy_price ? '$' + p.buy_price.toFixed(2) : '—'}</td>
-                    <td>${p.target_short ? '$' + p.target_short.toFixed(2) : '—'}</td>
-                    <td>${p.stop_loss ? '$' + p.stop_loss.toFixed(2) : '—'}</td>
-                    <td class="hide-mobile">—</td>
-                    <td>${(p.signals || [])[0] || '—'}</td>
-                </tr>`;
-            }).join('');
-            picksHtml += lockedRows + `
-                <tr class="unlock-cta-row"><td colspan="8">
-                    <div class="unlock-cta">
-                        <div>
-                            <strong>🔒 ${lockedPicks.length} more pick${lockedPicks.length > 1 ? 's' : ''} hidden</strong>
-                            <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">
-                                Unlock all daily picks, per-stock drilldowns, and real-time alerts with Pro.
-                            </div>
-                        </div>
-                        ${proCta('Unlock with Pro →', { className: 'btn-primary' })}
-                    </div>
-                </td></tr>`;
-            picksCardsHtml += lockedPicks.map(p => pickCard(p, { locked: true })).join('') + `
-                <div class="unlock-cta">
-                    <div>
-                        <strong>🔒 ${lockedPicks.length} more pick${lockedPicks.length > 1 ? 's' : ''} hidden</strong>
-                        <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">
-                            Unlock all daily picks, per-stock drilldowns, and real-time alerts with Pro.
-                        </div>
-                    </div>
-                    ${proCta('Unlock with Pro →', { className: 'btn-primary' })}
-                </div>`;
-        }
-    } else if (scan.stocks_scanned) {
-        picksHtml = `<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">
-            No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}
-        </td></tr>`;
-        picksCardsHtml = `<div class="pick-card-empty">No buy signals today — ${scan.stocks_scanned} stocks scanned${scan.top_pick ? `, top: ${scan.top_pick}` : ''}</div>`;
-    } else {
-        picksHtml = '<tr><td colspan="8" style="text-align:center;color:var(--text-secondary)">No recent scan data</td></tr>';
-        picksCardsHtml = '<div class="pick-card-empty">No recent scan data</div>';
+    // Locked-picks Pro upgrade teaser (Phase 13d.3) — surfaced only when
+    // free-tier user has hidden picks. Previously embedded inside the
+    // redundant "Today's full scan snapshot" table; lifted out so the
+    // snapshot itself can be deleted (it duplicated the action panel).
+    let lockedTeaserHtml = '';
+    const lockedPicksList = (scan._locked_picks || []);
+    if (lockedPicksList.length > 0) {
+        lockedTeaserHtml = `
+        <div class="unlock-cta" style="margin-top:8px">
+            <div>
+                <strong>🔒 ${lockedPicksList.length} more pick${lockedPicksList.length > 1 ? 's' : ''} hidden</strong>
+                <div style="font-size:13px;color:var(--text-secondary);margin-top:2px">
+                    Unlock all daily picks, per-stock drilldowns, and real-time alerts with Pro.
+                </div>
+            </div>
+            ${proCta('Unlock with Pro →', { className: 'btn-primary' })}
+        </div>`;
     }
 
     // Training status section
@@ -1175,28 +1121,7 @@ Router.register('/daily', async () => {
     </div>
 
     ${actionPanelHtml}
-
-    <details style="margin-top:8px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--card-bg)">
-        <summary style="cursor:pointer;font-size:14px;color:var(--text-secondary)">▸ Today's full scan snapshot (single-day, raw)</summary>
-        <div class="table-container" style="margin-top:12px">
-            <div class="table-header" style="display:flex;align-items:center;gap:10px">
-                Today's Picks
-                <span class="pill pill-blue" style="margin-left:auto">${(scan.top_picks||[]).length} ranked</span>
-                ${freshnessBadge(scan.scanned_at, { label: 'Scan' })}
-            </div>
-            <table class="picks-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th><th>Rec</th><th>Score</th>
-                        <th>Entry</th><th>Target</th><th>Stop</th><th class="hide-mobile">Size</th>
-                        <th>Key Signal</th>
-                    </tr>
-                </thead>
-                <tbody>${picksHtml}</tbody>
-            </table>
-            <div class="picks-cards">${picksCardsHtml}</div>
-        </div>
-    </details>`;
+    ${lockedTeaserHtml}`;
 });
 
 // ── Pipeline Page ───────────────────────────────────────────────────
