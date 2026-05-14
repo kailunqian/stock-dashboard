@@ -440,6 +440,7 @@ const API = {
     performance(onUpdate) { return this.fetchWithCache('performance', 'dashboard/performance', onUpdate); },
     performanceHistory(days = 90) { return this.fetch(`dashboard/performance/history?days=${days}`); },
     stock(sym)    { return this.fetch(`dashboard/stock/${sym}`); },
+    macro()       { return this.fetch('dashboard/macro'); },
     budget()      { return this.fetch('dashboard/budget'); },
     system()      { return this.fetch('dashboard/system'); },
     incidents()   { return this.fetch('dashboard/incidents'); },

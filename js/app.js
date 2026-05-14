@@ -879,7 +879,10 @@ Router.register('/signup', async () => {
 // ── Daily Report Page ───────────────────────────────────────────────
 
 Router.register('/daily', async () => {
-    const data = await API.daily();
+    const [data, macro] = await Promise.all([
+        API.daily(),
+        API.macro().catch(() => null),  // soft-fail: macro is additive
+    ]);
     if (!data) return '<p>Failed to load</p>';
 
     // Phase 13d.3: client-side Free-tier preview when admin is impersonating.
@@ -1099,6 +1102,36 @@ Router.register('/daily', async () => {
         Assumed portfolio = stocks the system marked as Buy on prior days. Not financial advice.
     </p>`;
 
+    // Today's Macro card — cross-cutting MarketNarrative themes
+    // (China trade, Fed, oil, AI regulation, earnings season).
+    // Hidden when no themes active or feature disabled.
+    let macroBanner = '';
+    if (macro && macro.enabled && Array.isArray(macro.themes)) {
+        const actives = macro.themes.filter(t => t.is_active);
+        if (actives.length > 0) {
+            const dirIcon = (d) => d === 'bullish' ? '🟢' : (d === 'bearish' ? '🔴' : '⚪');
+            const dirPill = (d) => d === 'bullish' ? 'green' : (d === 'bearish' ? 'red' : 'blue');
+            const themePills = actives.map(t => `
+                <span class="pill pill-${dirPill(t.direction)}" title="${(t.top_headlines||[]).join(' · ').replace(/"/g,'&quot;')}">
+                    ${dirIcon(t.direction)} ${t.label}
+                    <span style="opacity:0.75;margin-left:4px">${t.avg_sentiment > 0 ? '+' : ''}${(t.avg_sentiment*100).toFixed(0)}% · ${t.article_count}</span>
+                </span>`).join(' ');
+            const ageMin = macro.age_seconds != null ? Math.floor(macro.age_seconds / 60) : null;
+            const ageStr = ageMin != null ? `updated ${ageMin}m ago` : '';
+            macroBanner = `
+            <div class="glass" style="padding:14px 18px;margin-bottom:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+                <span style="font-size:22px;line-height:1">📰</span>
+                <div style="display:flex;flex-direction:column;gap:6px;flex:1;min-width:240px">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                        <strong style="font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:var(--text-secondary)">Today's Macro</strong>
+                        ${ageStr ? `<span style="font-size:11px;color:var(--text-secondary)">${ageStr}</span>` : ''}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap">${themePills}</div>
+                </div>
+            </div>`;
+        }
+    }
+
     return `
     <div class="hero">
         <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
@@ -1106,6 +1139,7 @@ Router.register('/daily', async () => {
 
     ${limitedBanner}
     ${regimeBanner}
+    ${macroBanner}
 
     <div class="card-grid">
         <div class="card featured" data-tier="strong-buy">
@@ -2128,6 +2162,36 @@ async function renderStockDetail(symbol) {
             <div>${risksHtml || '<span style="color:var(--text-secondary)">None</span>'}</div>
         </div>
     </div>
+
+    ${(data.macro_narrative_delta != null || (data.macro_narrative_breakdown||[]).length > 0) ? (() => {
+        const delta = +data.macro_narrative_delta || 0;
+        const lines = data.macro_narrative_breakdown || [];
+        if (delta === 0 && lines.length === 0) return '';
+        const tone = delta > 0 ? 'positive' : (delta < 0 ? 'negative' : 'neutral');
+        const arrow = delta > 0 ? '↑' : (delta < 0 ? '↓' : '→');
+        const sign = delta > 0 ? '+' : '';
+        const rows = lines.length > 0
+            ? lines.map(l => {
+                const m = l.match(/^(.*?):\s*([+-]?[\d.]+)/);
+                if (!m) return `<div style="font-size:13px;color:var(--text-secondary);padding:4px 0">${l}</div>`;
+                const label = m[1]; const v = +m[2];
+                const cls = v > 0 ? 'positive' : (v < 0 ? 'negative' : 'neutral');
+                return `<div style="display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-top:1px solid var(--border-subtle, rgba(255,255,255,0.06))">
+                    <span>${label}</span>
+                    <span class="${cls}"><strong>${v > 0 ? '+' : ''}${v.toFixed(1)}</strong></span>
+                </div>`;
+            }).join('')
+            : '<div style="font-size:13px;color:var(--text-secondary)">No active macro themes affect this stock today.</div>';
+        return `
+        <div class="card" style="margin-top:18px">
+            <div class="card-title">📰 Macro Impact</div>
+            <div style="display:flex;align-items:baseline;gap:8px;margin:6px 0 12px">
+                <span class="card-value ${tone}" style="font-size:24px">${arrow} ${sign}${delta.toFixed(1)}</span>
+                <span style="font-size:12px;color:var(--text-secondary)">cross-cutting news nudge to composite score</span>
+            </div>
+            ${rows}
+        </div>`;
+    })() : ''}
 
     ${data.reasoning ? `
     <div class="card">
