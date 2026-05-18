@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="StockAnalysis">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="description" content="AI-powered stock analysis dashboard — daily picks, ML metrics, performance tracking.">
+    <meta name="description" content="AI-powered stock analysis dashboard â€” daily picks, ML metrics, performance tracking.">
     <title>StockAnalysis Dashboard</title>
     <!-- PWA manifest + iOS Add-to-Home-Screen -->
     <link rel="manifest" href="manifest.json">
@@ -17,10 +17,10 @@
     <link rel="preconnect" href="https://func-stockanalysis-oksq5n.azurewebsites.net" crossorigin>
     <link rel="preconnect" href="https://rsms.me" crossorigin>
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-    <!-- Inter font (Linear-style typography) — non-blocking, system fallback acceptable -->
+    <!-- Inter font (Linear-style typography) â€” non-blocking, system fallback acceptable -->
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'">
     <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
-    <link rel="stylesheet" href="css/style.css?v=7.22">
+    <link rel="stylesheet" href="css/style.css?v=7.23">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%235E6AD2%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><polyline points=%2222 12 18 12 15 21 9 3 6 12 2 12%22/></svg>">
 
     <!-- Emergency service-worker reset. Visit ?reset-sw=1 to nuke all
@@ -51,10 +51,10 @@
     })();
     </script>
 
-    <!-- Incident reporter — load FIRST so window.onerror is hooked before
+    <!-- Incident reporter â€” load FIRST so window.onerror is hooked before
          any other script can throw. Excluded from SW SHELL_FILES so it's
          always network-only (a cached bad version would silence reports). -->
-    <script src="js/incident-reporter.js?v=7.22"></script>
+    <script src="js/incident-reporter.js?v=7.23"></script>
 </head>
 <body>
     <!-- Top navigation -->
@@ -85,7 +85,7 @@
         </div>
     </nav>
 
-    <!-- Persistent legal disclaimer (authenticated pages only — toggled by app.js).
+    <!-- Persistent legal disclaimer (authenticated pages only â€” toggled by app.js).
          Dismissible per browser session via sessionStorage; never per account. -->
     <div class="disclaimer-bar" id="disclaimer-bar" hidden role="note" aria-label="Legal disclaimer">
         <span class="disclaimer-text">
@@ -93,7 +93,7 @@
             See <a href="legal/terms.html">Terms</a> and <a href="legal/privacy.html">Privacy</a>.
         </span>
         <button type="button" class="disclaimer-dismiss" id="disclaimer-dismiss"
-                aria-label="Dismiss for this session">×</button>
+                aria-label="Dismiss for this session">Ã—</button>
     </div>
 
     <!-- App content (SPA) -->
@@ -101,42 +101,42 @@
         <div class="loading-overlay"><div class="spinner"></div> Loading...</div>
     </div>
 
-    <!-- Footer with legal links — visible on every page so search engines + users
+    <!-- Footer with legal links â€” visible on every page so search engines + users
          can find the policies even from the public landing/login page. -->
     <footer class="site-footer" aria-label="Site footer">
         <div class="site-footer-inner">
-            <span>© StockAnalysis</span>
-            <span class="dot">·</span>
+            <span>Â© StockAnalysis</span>
+            <span class="dot">Â·</span>
             <a href="legal/terms.html">Terms</a>
-            <span class="dot">·</span>
+            <span class="dot">Â·</span>
             <a href="legal/privacy.html">Privacy</a>
-            <span class="dot">·</span>
+            <span class="dot">Â·</span>
             <span class="muted">US &amp; Canada only</span>
         </div>
     </footer>
 
     <!-- Mobile bottom-nav (visibility gated by CSS: body.has-bottom-nav + @media <=768px) -->
     <nav class="bottom-nav" id="bottom-nav" aria-label="Primary navigation">
-        <a href="#/daily"       data-route="/daily"       aria-label="Daily picks"><span class="icon" aria-hidden="true">📊</span><span>Daily</span></a>
-        <a href="#/performance" data-route="/performance" aria-label="Performance"><span class="icon" aria-hidden="true">📈</span><span>Perf</span></a>
-        <a href="#/pipeline"    data-route="/pipeline"    data-admin-only aria-label="Pipeline"><span class="icon" aria-hidden="true">🔀</span><span>Pipeline</span></a>
-        <a href="#/budget"      data-route="/budget"      data-admin-only aria-label="Budget"><span class="icon" aria-hidden="true">💰</span><span>Budget</span></a>
-        <a href="#/system"      data-route="/system"      data-admin-only aria-label="System status"><span class="icon" aria-hidden="true">⚙️</span><span>System</span></a>
-        <a href="#/diagnostics" data-route="/diagnostics" data-admin-only aria-label="Diagnostics"><span class="icon" aria-hidden="true">🔬</span><span>Diag</span></a>
+        <a href="#/daily"       data-route="/daily"       aria-label="Daily picks"><span class="icon" aria-hidden="true">ðŸ“Š</span><span>Daily</span></a>
+        <a href="#/performance" data-route="/performance" aria-label="Performance"><span class="icon" aria-hidden="true">ðŸ“ˆ</span><span>Perf</span></a>
+        <a href="#/pipeline"    data-route="/pipeline"    data-admin-only aria-label="Pipeline"><span class="icon" aria-hidden="true">ðŸ”€</span><span>Pipeline</span></a>
+        <a href="#/budget"      data-route="/budget"      data-admin-only aria-label="Budget"><span class="icon" aria-hidden="true">ðŸ’°</span><span>Budget</span></a>
+        <a href="#/system"      data-route="/system"      data-admin-only aria-label="System status"><span class="icon" aria-hidden="true">âš™ï¸</span><span>System</span></a>
+        <a href="#/diagnostics" data-route="/diagnostics" data-admin-only aria-label="Diagnostics"><span class="icon" aria-hidden="true">ðŸ”¬</span><span>Diag</span></a>
     </nav>
 
-    <!-- TradingView Lightweight Charts (Apache-2.0) — used on per-symbol drilldown -->
+    <!-- TradingView Lightweight Charts (Apache-2.0) â€” used on per-symbol drilldown -->
     <script src="https://unpkg.com/lightweight-charts@5.0.7/dist/lightweight-charts.standalone.production.js"></script>
-    <script src="js/api.js?v=7.22"></script>
-    <script src="js/app.js?v=7.22"></script>
+    <script src="js/api.js?v=7.23"></script>
+    <script src="js/app.js?v=7.23"></script>
     <script>
-        // PWA service worker — best-effort, fails silently on http://localhost
+        // PWA service worker â€” best-effort, fails silently on http://localhost
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js').catch(() => {});
             });
         }
-        // Cookie notice (Phase 13e — privacy/transparency).
+        // Cookie notice (Phase 13e â€” privacy/transparency).
         // Not a consent banner: we currently use ONLY essential auth cookies,
         // so consent isn't legally required. This is a one-time disclosure.
         (function () {
@@ -147,14 +147,14 @@
                     div.id = 'cookie-notice';
                     div.setAttribute('role', 'note');
                     div.style.cssText = 'position:fixed;bottom:16px;right:16px;max-width:340px;padding:12px 14px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;font-size:13px;line-height:1.5;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,0.3)';
-                    div.innerHTML = 'We use a single session cookie to keep you signed in. No tracking, no ads. <a href="legal/privacy.html" style="color:#60a5fa;text-decoration:underline">Privacy</a> · <button id="cookie-notice-ok" style="margin-left:8px;background:#475569;color:white;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">Got it</button>';
+                    div.innerHTML = 'We use a single session cookie to keep you signed in. No tracking, no ads. <a href="legal/privacy.html" style="color:#60a5fa;text-decoration:underline">Privacy</a> Â· <button id="cookie-notice-ok" style="margin-left:8px;background:#475569;color:white;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px">Got it</button>';
                     document.body.appendChild(div);
                     document.getElementById('cookie-notice-ok').addEventListener('click', () => {
                         localStorage.setItem('cookie_notice_dismissed_v1', '1');
                         div.remove();
                     });
                 });
-            } catch (_) { /* localStorage blocked — don't break the page */ }
+            } catch (_) { /* localStorage blocked â€” don't break the page */ }
         })();
     </script>
 </body>

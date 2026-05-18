@@ -960,9 +960,60 @@ Router.register('/daily', async () => {
         </div>`;
     }
 
-    // Training status section
+    // Training status section — 2026-05-18: prefer the new daily_ml_activity
+    // panel that surfaces ALL 5+1 daily ML loops (not just the cadence-gated
+    // full retrain, which spends ~20/21 days in `skipped_refit_cadence` and
+    // confused users into thinking nothing was learning). Falls back to the
+    // legacy training card if the backend hasn't been redeployed yet.
     let trainingHtml = '';
-    if (training.action || training.trained_at) {
+    const mlAct = data.daily_ml_activity;
+    if (mlAct && Array.isArray(mlAct.daily_loops)) {
+        const statusToColor = {
+            healthy: 'positive', degraded: 'negative',
+            stale: 'neutral', unknown: 'neutral',
+        };
+        const headerColor = statusToColor[mlAct.overall_status] || 'neutral';
+        const fr = mlAct.full_retrain || {};
+        const inc = mlAct.incremental_update || {};
+        const loopRows = mlAct.daily_loops.map(l => {
+            const dotColor = l.ok && l.fresh ? '#22c55e'
+                           : (l.ok ? '#f59e0b' : '#ef4444');
+            return `<div style="display:flex;gap:8px;align-items:baseline;font-size:12px;line-height:1.5">
+                <span style="color:${dotColor}">●</span>
+                <span style="color:var(--text-secondary);min-width:170px;flex-shrink:0">${l.label}</span>
+                <span style="color:var(--text-primary);flex:1">${l.friendly_status || '—'}</span>
+            </div>`;
+        }).join('');
+        trainingHtml = `
+        <div class="card" style="grid-column:1 / -1">
+            <div class="card-header">
+                <div class="card-title">ML Activity (last 24h)</div>
+                <span class="pill pill-${headerColor === 'positive' ? 'green' : headerColor === 'negative' ? 'red' : 'blue'}" style="font-size:11px">
+                    ${(mlAct.overall_status || 'unknown').toUpperCase()}
+                </span>
+            </div>
+            <div class="card-value ${headerColor}" style="font-size:14px;line-height:1.4;font-weight:500">
+                ${mlAct.summary_line || ''}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+                <div>
+                    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Full retrain</div>
+                    <div style="font-size:12px">${fr.friendly_status || fr.status || '—'}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Incremental update</div>
+                    <div style="font-size:12px">${inc.friendly_status || '—'}</div>
+                </div>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border, rgba(255,255,255,0.08));display:flex;flex-direction:column;gap:4px">
+                ${loopRows}
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:var(--text-secondary)">
+                Full retrain is throttled to ~monthly by design (REFIT_CADENCE_DAYS=21).
+                Daily learning happens via the 5 loops above + the post-scan incremental update.
+            </div>
+        </div>`;
+    } else if (training.action || training.trained_at) {
         const statusColor = training.action === 'failed' ? 'negative' : 'positive';
         trainingHtml = `
         <div class="card">
@@ -1044,11 +1095,17 @@ Router.register('/daily', async () => {
         const entry = p.buy_price ? `$${p.buy_price.toFixed(2)}` : (p.current_price ? `$${p.current_price.toFixed(2)}` : '—');
         const target = p.target_short ? `$${p.target_short.toFixed(2)}` : '—';
         const stop = p.stop_loss ? `$${p.stop_loss.toFixed(2)}` : '—';
-        const note = kind === 'high' ? 'Both scorers agree — strongest signal'
+        let note = kind === 'high' ? 'Both scorers agree — strongest signal'
             : kind === 'buy' ? 'New entry'
             : kind === 'keep' ? 'Reaffirmed today'
             : kind === 'watch' ? 'Observe — do not buy yet'
             : 'Weakened';
+        // 2026-05-18: surface near-miss diagnostic when a Watch pick had high
+        // composite but didn't clear the two-path Buy gate (catalyst OR
+        // breakout). Answers the recurring user question "EOG 74 but not buy?".
+        if (p.near_miss_text) {
+            note = `<span title="${p.near_miss_text}">${p.near_miss_text}</span>`;
+        }
         return `<tr onclick="window.location.hash='#/stock/${sym}'" style="cursor:pointer">
             <td><strong>${sym}</strong>${v2Badge ? ' ' + v2Badge : ''}</td>
             <td>${tierPill}</td>
