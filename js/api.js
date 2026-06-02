@@ -455,4 +455,7 @@ const API = {
     v2ShadowSummary(days = 7) {
         return this.fetch(`dashboard/admin/v2-shadow-summary?days=${days}`);
     },
+    mlStatus(days = 14) {
+        return this.fetch(`dashboard/admin/ml-status?days=${days}`);
+    },
 };

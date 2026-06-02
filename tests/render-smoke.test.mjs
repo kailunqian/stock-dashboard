@@ -89,6 +89,7 @@ function bootDashboard() {
         window.__Router = Router;
         window.__API = API;
         window.__renderStockDetail = (typeof renderStockDetail === 'function') ? renderStockDetail : null;
+        window.__renderMlHealthTile = (typeof renderMlHealthTile === 'function') ? renderMlHealthTile : null;
     `;
     vm.runInContext(code, context, { filename: 'dashboard-bundle.js' });
     return { window, Router: window.__Router, API: window.__API, renderStockDetail: window.__renderStockDetail };
@@ -156,7 +157,7 @@ function systemData(overrides = {}) {
 function performanceData(overrides = {}) {
     return {
         scorecard: { scorecards: { all: { total_picks: 10, hit_rate: 0.6, winners: 6, losers: 4, avg_return: 0.03, cumulative_return: 0.3, strong_buy_count: 0, buy_count: 0, high_conf_picks: 0 } } },
-        model_metrics: { version: '1.2.0', accuracy: 0.61, auc_roc: 0.62, feature_count: 72, symbols_analyzed: 100 },
+        model_metrics: { version: '1.2.0', accuracy: 0.61, auc_roc: 0.62, feature_count: 72, symbols_analyzed: 100, has_llm: true, has_social: true, metrics: { precision: 0.58, recall: 0.55 } },
         scorer_state: {},
         training_status: {},
         accuracy_breakdown: {
@@ -256,9 +257,9 @@ function stockDetailData(overrides = {}) {
 
 // ── Tests ───────────────────────────────────────────────────────────────
 async function main() {
-    let Router, API, renderStockDetail;
+    let Router, API, renderStockDetail, window;
     try {
-        ({ Router, API, renderStockDetail } = bootDashboard());
+        ({ window, Router, API, renderStockDetail } = bootDashboard());
     } catch (e) {
         fail('boot dashboard bundle', `failed to load api.js + app.js under jsdom:\n   ${e.stack || e}`);
         finish();
@@ -301,8 +302,40 @@ async function main() {
         const a = assertIncludes('system: ml-health tile heading', html, 'ML Buy-Path Health');
         const b = assertIncludes('system: ml-health coverage value', html, '42%');
         const c = assertIncludes('system: ml-health live badge', html, 'LIVE');
-        if (a && b && c) ok('system: ML Buy-Path Health tile renders coverage + diagnosis from data.ml_health');
+        const d = assertIncludes('system: ml-health tile id', html, 'id="ml-health-tile"');
+        const e = assertIncludes('system: ml-health lookback selector', html, '_reloadMlHealth(30)');
+        if (a && b && c && d && e) ok('system: ML Buy-Path Health tile renders coverage + diagnosis + lookback selector from data.ml_health');
     } catch (e) { fail('system render', e.stack || String(e)); }
+
+    // 2c) System — lookback selector refetches via API.mlStatus and swaps the tile
+    try {
+        window.document.body.innerHTML = `<div id="app">${window.__renderMlHealthTile({
+            lookback_days: 14,
+            runtime_flags: { ADAPTIVE_ML_ENABLED: true, ADAPTIVE_ML_KILL_SWITCH: false },
+            config_flags: { ml_buy_union_enabled: true },
+            champion_model: { present: true, version: '5', auc: 0.61 },
+            db_coverage: { champion_p_hit_coverage_pct: 42, champion_p_hit_non_null: 21, predictions_total: 50 },
+            diagnosis: 'ok',
+        })}</div>`;
+        let askedDays = null;
+        API.mlStatus = async (days) => {
+            askedDays = days;
+            return {
+                lookback_days: days,
+                runtime_flags: { ADAPTIVE_ML_ENABLED: true, ADAPTIVE_ML_KILL_SWITCH: false },
+                config_flags: { ml_buy_union_enabled: true },
+                champion_model: { present: true, version: '5', auc: 0.61 },
+                db_coverage: { champion_p_hit_coverage_pct: 37, champion_p_hit_non_null: 60, predictions_total: 160 },
+                diagnosis: 'ok',
+            };
+        };
+        await window._reloadMlHealth(90);
+        const swapped = window.document.getElementById('ml-health-tile').outerHTML;
+        const a = askedDays === 90 ? ok('system: lookback selector calls API.mlStatus(90)') : fail('system: lookback selector days', `expected 90, got ${askedDays}`);
+        const b = assertIncludes('system: reloaded tile window', swapped, 'last 90d');
+        const c = assertIncludes('system: reloaded tile coverage', swapped, '37%');
+        if (b && c) ok('system: ML Buy-Path Health tile is refetched + swapped in place for a new lookback window');
+    } catch (e) { fail('system render (ml-status reload)', e.stack || String(e)); }
 
     // 2b) System — degraded ML health flips badge to CHECK
     try {
@@ -331,6 +364,11 @@ async function main() {
         const b = assertIncludes('performance: live segment label', html, 'Live (forward picks)');
         const c = assertIncludes('performance: backtest segment label', html, 'Backtest');
         if (a && b && c) ok('performance: Live-vs-Backtest accuracy card renders from data.accuracy_breakdown');
+        const d = assertIncludes('performance: feature-source label', html, 'Feature sources');
+        const e = assertIncludes('performance: feature-source pill (LLM)', html, '>LLM<');
+        const f = assertIncludes('performance: feature-source pill (Social)', html, '>Social<');
+        const g = assertIncludes('performance: extra training metric', html, 'precision');
+        if (d && e && f && g) ok('performance: ML Model Performance card surfaces model_metrics.has_* feature sources + extra metrics');
     } catch (e) { fail('performance render', e.stack || String(e)); }
 
     // 4) Pipeline — analysis flow renders from API.daily().pipeline

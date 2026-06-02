@@ -1540,6 +1540,21 @@ Router.register('/performance', async () => {
             ${scorer.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:8px">Training samples: ${scorer.training_samples}</div>` : ''}
             ${mm.symbols_analyzed ? `<div style="font-size:13px;color:var(--text-secondary)">Symbols analyzed: ${mm.symbols_analyzed}</div>` : ''}
             ${mm.feature_count ? `<div style="font-size:13px;color:var(--text-secondary)">Features: ${mm.feature_count}</div>` : ''}
+            ${(() => {
+                const srcs = [];
+                if (mm.has_llm) srcs.push('LLM');
+                if (mm.has_fq) srcs.push('FQ');
+                if (mm.has_mi) srcs.push('MI');
+                if (mm.has_social) srcs.push('Social');
+                return srcs.length ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <span style="font-size:12px;color:var(--text-secondary)">Feature sources:</span>
+                ${srcs.map(s => `<span class="pill pill-blue" style="font-size:11px">${s}</span>`).join('')}
+            </div>` : '';
+            })()}
+            ${mm.metrics && typeof mm.metrics === 'object' ? (() => {
+                const keys = ['precision', 'recall', 'f1', 'test_auc', 'val_auc'].filter(k => typeof mm.metrics[k] === 'number');
+                return keys.length ? `<div style="margin-top:8px;font-size:12px;color:var(--text-secondary)">${keys.map(k => `${k}: <strong style="color:var(--text-primary)">${mm.metrics[k].toFixed(3)}</strong>`).join(' · ')}</div>` : '';
+            })() : ''}
         </div>`;
     }
 
@@ -2404,6 +2419,77 @@ Router.register('/budget', async () => {
 
 // ── System Page ─────────────────────────────────────────────────────
 
+// ── Shared ML buy-path health tile ──────────────────────────────────
+// Rendered on the System page from the embedded data.ml_health payload, and
+// re-rendered in place when the user picks a different lookback window via the
+// dedicated dashboard/admin/ml-status endpoint (API.mlStatus). Keeping a single
+// renderer ensures the initial paint and the refreshed tile stay identical.
+function renderMlHealthTile(mlh) {
+    mlh = mlh || {};
+    const days = mlh.lookback_days || 14;
+    const lookbackBtns = [7, 14, 30, 90].map(d => {
+        const active = d === days;
+        return `<button type="button" onclick="window._reloadMlHealth(${d})" data-days="${d}" class="ml-health-window-btn" style="font-size:11px;padding:2px 8px;border-radius:6px;cursor:pointer;border:1px solid var(--border,rgba(255,255,255,0.12));background:${active ? 'var(--accent,#5E6AD2)' : 'transparent'};color:${active ? '#fff' : 'var(--text-secondary)'}">${d}d</button>`;
+    }).join('');
+    const isError = !!mlh.error;
+    const rf = mlh.runtime_flags || {};
+    const cf = mlh.config_flags || {};
+    const cm = mlh.champion_model || {};
+    const cov = mlh.db_coverage || {};
+    const covPct = typeof cov.champion_p_hit_coverage_pct === 'number' ? cov.champion_p_hit_coverage_pct : null;
+    const healthy = !isError && !!(rf.ADAPTIVE_ML_ENABLED && !rf.ADAPTIVE_ML_KILL_SWITCH && cm.present && covPct > 0 && cf.ml_buy_union_enabled);
+    const badge = isError
+        ? '<span class="pill pill-yellow" style="font-size:11px;margin-left:6px">N/A</span>'
+        : `<span class="pill pill-${healthy ? 'green' : 'yellow'}" style="font-size:11px;margin-left:6px">${healthy ? 'LIVE' : 'CHECK'}</span>`;
+    const header = `
+            <div class="card-header">
+                <div class="card-title">ML Buy-Path Health ${badge}</div>
+                <div style="display:flex;gap:4px;align-items:center">${lookbackBtns}</div>
+            </div>`;
+    if (isError) {
+        return `
+        <div class="card" id="ml-health-tile" style="grid-column:1 / -1">
+            ${header}
+            <div class="card-value neutral" style="font-size:16px;margin-top:8px">Unavailable</div>
+            <div class="card-subtitle">${mlh.error}</div>
+        </div>`;
+    }
+    const covClass = covPct == null ? 'neutral' : (covPct > 0 ? 'positive' : 'negative');
+    const flagPill = (on, label) => `<span class="pill pill-${on ? 'green' : 'red'}">${on ? '✅' : '⬜'} ${label}</span>`;
+    return `
+        <div class="card" id="ml-health-tile" style="grid-column:1 / -1">
+            ${header}
+            <div class="card-value ${covClass}" style="font-size:28px">${covPct != null ? covPct.toFixed(0) + '%' : '—'}</div>
+            <div class="card-subtitle">champion_p_hit coverage · last ${days}d (${cov.champion_p_hit_non_null ?? '?'}/${cov.predictions_total ?? '?'} predictions)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+                ${flagPill(rf.ADAPTIVE_ML_ENABLED, 'ML enabled')}
+                ${flagPill(!rf.ADAPTIVE_ML_KILL_SWITCH, 'kill-switch clear')}
+                ${flagPill(cm.present, 'champion model')}
+                ${flagPill(cf.ml_buy_union_enabled, 'buy union')}
+            </div>
+            ${cm.present ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:10px">
+                Champion v${cm.version || '?'}${typeof cm.auc === 'number' ? ` · AUC ${cm.auc.toFixed(3)}` : ''}${cm.trained_at ? ` · trained ${timeSince(cm.trained_at)}` : ''}
+            </div>` : ''}
+            ${mlh.diagnosis ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;font-style:italic;line-height:1.5">${mlh.diagnosis}</div>` : ''}
+        </div>`;
+}
+
+// Re-fetch the ML buy-path health tile for a user-selected lookback window and
+// swap it in place without re-rendering the whole System page.
+window._reloadMlHealth = async (days) => {
+    const tile = document.getElementById('ml-health-tile');
+    if (!tile) return;
+    try {
+        const mlh = await API.mlStatus(days);
+        const tmp = document.createElement('div');
+        tmp.innerHTML = renderMlHealthTile(mlh).trim();
+        const fresh = tmp.firstElementChild;
+        if (fresh) tile.replaceWith(fresh);
+    } catch (e) {
+        console.error('ml-status reload failed', e);
+    }
+};
+
 Router.register('/system', async () => {
     const data = await API.system();
     if (!data) return '<p>Failed to load</p>';
@@ -2572,41 +2658,12 @@ Router.register('/system', async () => {
             <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Per-worker sample · candidates filed as incidents</div>
         </div>`;
 
-    // ── ML buy-path health tile ─────────────────────────────────────
+    // ── ML buy-path health tile (shared renderer) ───────────────────
     // Surfaces *why* champion_p_hit may be NULL: the runtime gate, champion
     // manifest presence, p_hit coverage over the lookback window, and a
-    // one-line diagnosis. New backend field: data.ml_health.
-    const mlh = data.ml_health || {};
-    let mlHealthHtml = '';
-    if (mlh && !mlh.error) {
-        const rf = mlh.runtime_flags || {};
-        const cf = mlh.config_flags || {};
-        const cm = mlh.champion_model || {};
-        const cov = mlh.db_coverage || {};
-        const covPct = typeof cov.champion_p_hit_coverage_pct === 'number' ? cov.champion_p_hit_coverage_pct : null;
-        const healthy = !!(rf.ADAPTIVE_ML_ENABLED && !rf.ADAPTIVE_ML_KILL_SWITCH && cm.present && covPct > 0 && cf.ml_buy_union_enabled);
-        const covClass = covPct == null ? 'neutral' : (covPct > 0 ? 'positive' : 'negative');
-        const flagPill = (on, label) => `<span class="pill pill-${on ? 'green' : 'red'}">${on ? '✅' : '⬜'} ${label}</span>`;
-        mlHealthHtml = `
-        <div class="card" style="grid-column:1 / -1">
-            <div class="card-header">
-                <div class="card-title">ML Buy-Path Health</div>
-                <span class="pill pill-${healthy ? 'green' : 'yellow'}" style="font-size:11px">${healthy ? 'LIVE' : 'CHECK'}</span>
-            </div>
-            <div class="card-value ${covClass}" style="font-size:28px">${covPct != null ? covPct.toFixed(0) + '%' : '—'}</div>
-            <div class="card-subtitle">champion_p_hit coverage · last ${mlh.lookback_days || '?'}d (${cov.champion_p_hit_non_null ?? '?'}/${cov.predictions_total ?? '?'} predictions)</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
-                ${flagPill(rf.ADAPTIVE_ML_ENABLED, 'ML enabled')}
-                ${flagPill(!rf.ADAPTIVE_ML_KILL_SWITCH, 'kill-switch clear')}
-                ${flagPill(cm.present, 'champion model')}
-                ${flagPill(cf.ml_buy_union_enabled, 'buy union')}
-            </div>
-            ${cm.present ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:10px">
-                Champion v${cm.version || '?'}${typeof cm.auc === 'number' ? ` · AUC ${cm.auc.toFixed(3)}` : ''}${cm.trained_at ? ` · trained ${timeSince(cm.trained_at)}` : ''}
-            </div>` : ''}
-            ${mlh.diagnosis ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;font-style:italic;line-height:1.5">${mlh.diagnosis}</div>` : ''}
-        </div>`;
-    }
+    // one-line diagnosis. New backend field: data.ml_health. The lookback
+    // selector re-fetches via the dedicated dashboard/admin/ml-status endpoint.
+    const mlHealthHtml = data.ml_health ? renderMlHealthTile(data.ml_health) : '';
 
     const sources = [];
     if (model.has_llm) sources.push('LLM');

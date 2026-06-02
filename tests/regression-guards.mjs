@@ -217,6 +217,31 @@ console.log('');
     }
 }
 
+// ─── 9. ml-status lookback endpoint stays wired end-to-end ──────────────
+// The System ML Buy-Path Health tile exposes a 7/14/30/90d lookback selector
+// that refetches via the dedicated dashboard/admin/ml-status endpoint. Pin the
+// api.js method + app.js consumer so the selector can't silently become inert
+// (the symptom: clicking a window does nothing and the endpoint goes unused).
+{
+    const api = read('js/api.js');
+    const app = read('js/app.js');
+    const errs = [];
+    if (!/mlStatus\s*\(/.test(api) || !/dashboard\/admin\/ml-status/.test(api)) {
+        errs.push('api.js missing mlStatus() → dashboard/admin/ml-status method');
+    }
+    if (!/API\.mlStatus\s*\(/.test(app)) {
+        errs.push('app.js never calls API.mlStatus() — lookback selector is dead');
+    }
+    if (!/_reloadMlHealth/.test(app) || !/renderMlHealthTile\s*\(/.test(app)) {
+        errs.push('app.js missing _reloadMlHealth handler or shared renderMlHealthTile renderer');
+    }
+    if (errs.length) {
+        fail('ml-status lookback wiring', errs.join('\n   '));
+    } else {
+        ok('ml-status: api.mlStatus + _reloadMlHealth + renderMlHealthTile all wired');
+    }
+}
+
 if (failures.length > 0) {
     console.error(`\n💥 ${failures.length} regression guard(s) failed:\n`);
     for (const f of failures) console.error(f + '\n');
