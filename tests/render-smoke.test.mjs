@@ -88,9 +88,10 @@ function bootDashboard() {
         ;
         window.__Router = Router;
         window.__API = API;
+        window.__renderStockDetail = (typeof renderStockDetail === 'function') ? renderStockDetail : null;
     `;
     vm.runInContext(code, context, { filename: 'dashboard-bundle.js' });
-    return { window, Router: window.__Router, API: window.__API };
+    return { window, Router: window.__Router, API: window.__API, renderStockDetail: window.__renderStockDetail };
 }
 
 // ── Mock payload factories (shape mirrors src/http/dashboard_routes.py) ──
@@ -174,11 +175,90 @@ function performanceData(overrides = {}) {
     };
 }
 
+function pipelineData(overrides = {}) {
+    // /pipeline reads API.daily()'s `pipeline` (+ scan/model) surface.
+    return dailyData({
+        pipeline: {
+            sources: [{ name: 'Yahoo', type: 'market' }, { name: 'News', type: 'news' }],
+            stocks_fetched: 150,
+            features: { total: 72, groups: [{ name: 'Technical', count: 25 }, { name: 'Fundamental', count: 15 }] },
+            strategies: [
+                { abbr: 'MOM', status: 'active', focus: 'Momentum', name: 'Momentum' },
+                { abbr: 'VAL', status: 'shadow' },
+            ],
+            strategy_counts: { active: 1 },
+            model: { accuracy: 0.61, components: ['GBM', 'RF'], samples: 12000 },
+            scoring: { weights: { technical: 0.3, ml: 0.25, fundamental: 0.2 }, threshold: 75 },
+            output: { picks: 6, top_pick: 'NVDA', top_score: 88, delivery: ['Telegram', 'Dashboard'] },
+        },
+        ...overrides,
+    });
+}
+
+function diagnosticsData(overrides = {}) {
+    return {
+        totals: { scanned: 450, high_conviction: 2, near_miss: 5 },
+        per_day: { '2026-06-01': { scanned: 150, high_conviction: 2, near_miss: 5 } },
+        high_conviction_today: [
+            { symbol: 'NVDA', score: 88.5, n_signals: 4, signals: ['breakout', 'catalyst', 'momentum'] },
+        ],
+        near_miss_today: [
+            { symbol: 'EOG', score: 74.2, n_signals: 2, gates: { score_pass: true, signals_pass: false, no_hard_risks: true }, fail_reasons: ['no catalyst', 'thin breakout'] },
+        ],
+        ...overrides,
+    };
+}
+
+function v2ShadowData(overrides = {}) {
+    return {
+        days_window: 7,
+        scoring_v2_enforce: false,
+        totals: { legacy_strong_buy: 1, legacy_buy: 3, v2_strong_buy: 1, v2_buy: 2, v2_only: 1, agree_buy_or_above: 2, legacy_only: 2 },
+        v2_only_picks: [
+            { date: '2026-06-01', symbol: 'AMD', legacy_score: 68, v2_tier: 'Buy', v2_path: 'catalyst', catalyst_score: 3, signals: ['earnings', 'breakout'] },
+        ],
+        ...overrides,
+    };
+}
+
+function stockDetailData(overrides = {}) {
+    return {
+        symbol: 'NVDA',
+        recommendation: 'Strong Buy',
+        recommendation_emoji: '🔥',
+        composite_score: 88,
+        current_price: 102.5,
+        buy_price: 100,
+        target_short: 120,
+        target_long: 140,
+        stop_loss: 90,
+        signals: ['breakout', 'volume surge'],
+        risks: [],
+        ml_status: 'champion',
+        scores: {
+            technical: { value: 85, weight: 0.3 },
+            fundamental: { value: 70, weight: 0.2 },
+            momentum: { value: 90, weight: 0.2 },
+            news: { value: 65, weight: 0.15 },
+            strategy: { value: 80, weight: 0.15 },
+        },
+        weighted_contributions: { technical: 25.5, fundamental: 14, momentum: 18, news: 9.75, strategy: 12 },
+        macro_narrative_delta: 1.4,
+        macro_narrative_breakdown: ['AI demand: +1.2', 'Rates: -0.3'],
+        reasoning: 'Strong technical breakout with supportive AI-demand macro tailwind.',
+        history: [
+            { time: '2026-05-30', open: 98, high: 103, low: 97, close: 101, volume: 1000000 },
+            { time: '2026-05-31', open: 101, high: 104, low: 100, close: 102.5, volume: 1200000 },
+        ],
+        ...overrides,
+    };
+}
+
 // ── Tests ───────────────────────────────────────────────────────────────
 async function main() {
-    let Router, API;
+    let Router, API, renderStockDetail;
     try {
-        ({ Router, API } = bootDashboard());
+        ({ Router, API, renderStockDetail } = bootDashboard());
     } catch (e) {
         fail('boot dashboard bundle', `failed to load api.js + app.js under jsdom:\n   ${e.stack || e}`);
         finish();
@@ -252,6 +332,54 @@ async function main() {
         const c = assertIncludes('performance: backtest segment label', html, 'Backtest');
         if (a && b && c) ok('performance: Live-vs-Backtest accuracy card renders from data.accuracy_breakdown');
     } catch (e) { fail('performance render', e.stack || String(e)); }
+
+    // 4) Pipeline — analysis flow renders from API.daily().pipeline
+    try {
+        API.daily = async () => pipelineData();
+        const html = await handler('/pipeline')();
+        const a = assertIncludes('pipeline: page title', html, 'Analysis Pipeline');
+        const b = assertIncludes('pipeline: data sources stage', html, 'Data Sources');
+        const c = assertIncludes('pipeline: ml ensemble stage', html, 'ML Ensemble');
+        const d = assertIncludes('pipeline: top picks stage', html, 'Top Picks');
+        if (a && b && c && d) ok('pipeline: analysis-flow stages render from data.pipeline');
+    } catch (e) { fail('pipeline render', e.stack || String(e)); }
+
+    // 5) Diagnostics — near-miss + v2 shadow render from diagnostics/v2 payloads
+    try {
+        API.diagnostics = async () => diagnosticsData();
+        API.v2ShadowSummary = async () => v2ShadowData();
+        const html = await handler('/diagnostics')();
+        const a = assertIncludes('diagnostics: page title', html, 'Near-Miss Analysis');
+        const b = assertIncludes('diagnostics: high-conviction row', html, 'NVDA');
+        const c = assertIncludes('diagnostics: near-miss row', html, 'EOG');
+        const d = assertIncludes('diagnostics: v2 shadow section', html, 'v2 Conviction Shadow');
+        const e2 = assertIncludes('diagnostics: v2-only pick', html, 'AMD');
+        if (a && b && c && d && e2) ok('diagnostics: near-miss tables + v2 shadow section render');
+    } catch (e) { fail('diagnostics render', e.stack || String(e)); }
+
+    // 5b) Diagnostics — v2 section omitted when shadow summary unavailable
+    try {
+        API.diagnostics = async () => diagnosticsData();
+        API.v2ShadowSummary = async () => null;
+        const html = await handler('/diagnostics')();
+        if (assertExcludes('diagnostics: v2 omitted when null', html, 'v2 Conviction Shadow')) {
+            ok('diagnostics: v2 shadow section omitted when summary is unavailable');
+        }
+    } catch (e) { fail('diagnostics render (no v2)', e.stack || String(e)); }
+
+    // 6) Stock detail — per-symbol drilldown renders from API.stock(symbol)
+    try {
+        if (typeof renderStockDetail !== 'function') throw new Error('renderStockDetail not exposed from bundle');
+        API.stock = async () => stockDetailData();
+        const html = await renderStockDetail('NVDA');
+        const a = assertIncludes('stock: title with recommendation', html, 'NVDA — Strong Buy');
+        const b = assertIncludes('stock: composite score card', html, 'Composite Score');
+        const c = assertIncludes('stock: decision flow', html, 'Decision Flow');
+        const d = assertIncludes('stock: macro impact (macro_narrative_delta)', html, 'Macro Impact');
+        const e2 = assertIncludes('stock: AI reasoning', html, 'AI Reasoning');
+        const f = assertIncludes('stock: price chart from history', html, 'Price Chart');
+        if (a && b && c && d && e2 && f) ok('stock detail: scores, decision flow, macro impact, chart + reasoning render');
+    } catch (e) { fail('stock detail render', e.stack || String(e)); }
 
     finish();
 }
