@@ -169,6 +169,54 @@ console.log('');
     }
 }
 
+// ─── 7. New dashboard panels stay wired to their backend fields ─────────
+// Each panel surfaces a recent stock-analytics backend addition. Pin the
+// field→render wiring so a future refactor can't silently drop the panel
+// (the symptom would be a blank section users never notice is missing).
+{
+    const app = read('js/app.js');
+    const errs = [];
+
+    // Daily: Buy-Tier Fusion panel (Phase J5 daily_fusion_summary).
+    if (!/data\.fusion\b/.test(app) || !/Buy-Tier Fusion/.test(app)) {
+        errs.push('Daily Buy-Tier Fusion panel missing (expects data.fusion + "Buy-Tier Fusion")');
+    }
+    // System: ML buy-path health tile (system.ml_health).
+    if (!/data\.ml_health\b/.test(app) || !/ML Buy-Path Health/.test(app)) {
+        errs.push('System ML Buy-Path Health tile missing (expects data.ml_health + "ML Buy-Path Health")');
+    }
+    // Performance: live-vs-backtest accuracy split (accuracy_breakdown).
+    if (!/data\.accuracy_breakdown\b/.test(app) || !/Live vs Backtest/.test(app)) {
+        errs.push('Performance accuracy split missing (expects data.accuracy_breakdown + "Live vs Backtest")');
+    }
+
+    if (errs.length) {
+        fail('new dashboard panels wiring', errs.join('\n   '));
+    } else {
+        ok('new panels wired: fusion (Daily), ml_health (System), accuracy_breakdown (Performance)');
+    }
+}
+
+// ─── 8. Dead #/stock stub stays gone; dynamic #/stock/:symbol stays live ─
+{
+    const app = read('js/app.js');
+    const errs = [];
+    if (/Router\.register\(\s*['"]\/stock['"]/.test(app)) {
+        errs.push('bare #/stock placeholder route was re-added — it is a dead stub no link points to');
+    }
+    if (!/renderStockDetail\s*\(/.test(app) || !/\\\/stock\\\/\(\[A-Z0-9\]\+\)/.test(app)) {
+        // tolerate regex-escaping differences: just require the dynamic handler + matcher exist
+        if (!/renderStockDetail\s*\(/.test(app) || !/stock\\?\/\(\[A-Z0-9\]/.test(app)) {
+            errs.push('dynamic #/stock/:symbol handler missing (renderStockDetail + hash matcher)');
+        }
+    }
+    if (errs.length) {
+        fail('stock route hygiene', errs.join('\n   '));
+    } else {
+        ok('stock routes: dead stub removed, dynamic #/stock/:symbol intact');
+    }
+}
+
 if (failures.length > 0) {
     console.error(`\n💥 ${failures.length} regression guard(s) failed:\n`);
     for (const f of failures) console.error(f + '\n');
