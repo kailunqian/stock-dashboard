@@ -960,75 +960,12 @@ Router.register('/daily', async () => {
         </div>`;
     }
 
-    // Training status section — 2026-05-18: prefer the new daily_ml_activity
-    // panel that surfaces ALL 5+1 daily ML loops (not just the cadence-gated
-    // full retrain, which spends ~20/21 days in `skipped_refit_cadence` and
-    // confused users into thinking nothing was learning). Falls back to the
-    // legacy training card if the backend hasn't been redeployed yet.
-    let trainingHtml = '';
-    const mlAct = data.daily_ml_activity;
-    if (mlAct && Array.isArray(mlAct.daily_loops)) {
-        const statusToColor = {
-            healthy: 'positive', degraded: 'negative',
-            stale: 'neutral', unknown: 'neutral',
-        };
-        const headerColor = statusToColor[mlAct.overall_status] || 'neutral';
-        const fr = mlAct.full_retrain || {};
-        const inc = mlAct.incremental_update || {};
-        const loopRows = mlAct.daily_loops.map(l => {
-            const dotColor = l.ok && l.fresh ? '#22c55e'
-                           : (l.ok ? '#f59e0b' : '#ef4444');
-            return `<div style="display:flex;gap:8px;align-items:baseline;font-size:12px;line-height:1.5">
-                <span style="color:${dotColor}">●</span>
-                <span style="color:var(--text-secondary);min-width:170px;flex-shrink:0">${l.label}</span>
-                <span style="color:var(--text-primary);flex:1">${l.friendly_status || '—'}</span>
-            </div>`;
-        }).join('');
-        trainingHtml = `
-        <div class="card" style="grid-column:1 / -1">
-            <div class="card-header">
-                <div class="card-title">ML Activity (last 24h)</div>
-                <span class="pill pill-${headerColor === 'positive' ? 'green' : headerColor === 'negative' ? 'red' : 'blue'}" style="font-size:11px">
-                    ${(mlAct.overall_status || 'unknown').toUpperCase()}
-                </span>
-            </div>
-            <div class="card-value ${headerColor}" style="font-size:14px;line-height:1.4;font-weight:500">
-                ${mlAct.summary_line || ''}
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
-                <div>
-                    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Full retrain</div>
-                    <div style="font-size:12px">${fr.friendly_status || fr.status || '—'}</div>
-                </div>
-                <div>
-                    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Incremental update</div>
-                    <div style="font-size:12px">${inc.friendly_status || '—'}</div>
-                </div>
-            </div>
-            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border, rgba(255,255,255,0.08));display:flex;flex-direction:column;gap:4px">
-                ${loopRows}
-            </div>
-            <div style="margin-top:10px;font-size:11px;color:var(--text-secondary)">
-                Full retrain is throttled to ~monthly by design (REFIT_CADENCE_DAYS=21).
-                Daily learning happens via the 5 loops above + the post-scan incremental update.
-            </div>
-        </div>`;
-    } else if (training.action || training.trained_at) {
-        const statusColor = training.action === 'failed' ? 'negative' : 'positive';
-        trainingHtml = `
-        <div class="card">
-            <div class="card-title">Training Status</div>
-            <div class="card-value ${statusColor}">${training.action || '—'}</div>
-            <div class="card-subtitle">${timeSince(training.trained_at)}</div>
-            ${training.training_samples ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">${training.training_samples} training samples</div>` : ''}
-            ${training.budget_tier ? `<div style="font-size:13px;color:var(--text-secondary)">Budget: ${training.budget_tier} (headroom: $${training.budget_headroom?.toFixed(2) || '?'})</div>` : ''}
-        </div>`;
-    }
+    // ML Activity (last 24h) + legacy Training Status were relocated to the
+    // System page (2026-06-02). They are ML-ops telemetry that pushed the
+    // actual buy/keep/watch/sell actions — the reason this tab exists — below
+    // the fold. The panel now renders via renderMlActivityPanel() on /system.
 
     const strongBuyCount = (scan.top_picks || []).filter(p => p.recommendation === 'Strong Buy').length;
-    const accPct = model.accuracy ? `${(model.accuracy * 100).toFixed(0)}%` : '—';
-    const topPickSym = scan.top_pick || '—';
-    const topPickScore = scan.top_score ? scan.top_score.toFixed(0) : '—';
 
     // ── Action panel: High Conviction / Buy / Keep / Watch / Sell ──
     // Uses TWO scoring layers cross-referenced with rolling multi-day signals:
@@ -1285,7 +1222,6 @@ Router.register('/daily', async () => {
             <div class="card-header"><div class="card-title">Stocks Scanned</div></div>
             <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
             <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
-            ${scan.elapsed ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:4px">Elapsed: ${scan.elapsed.toFixed(1)}s</div>` : ''}
         </div>
         <div class="card">
             <div class="card-header">
@@ -1295,12 +1231,6 @@ Router.register('/daily', async () => {
             <div class="card-value neutral">${scan.top_pick || '—'}</div>
             <div class="card-subtitle">Highest composite score today</div>
         </div>
-        <div class="card">
-            <div class="card-header"><div class="card-title">ML Model</div></div>
-            <div class="card-value code">${model.version || training.model_version || '—'}</div>
-            <div class="card-subtitle" style="margin-top:8px">${model.accuracy ? `Accuracy: ${(model.accuracy * 100).toFixed(1)}%` : timeSince(training.trained_at)}</div>
-        </div>
-        ${trainingHtml}
     </div>
 
     ${actionPanelHtml}
@@ -2490,10 +2420,69 @@ window._reloadMlHealth = async (days) => {
     }
 };
 
+// ── Shared ML Activity (last 24h) panel ─────────────────────────────
+// Surfaces ALL daily ML loops (the 5 intraday loops + the post-scan
+// incremental update), not just the cadence-gated ~monthly full retrain.
+// Sourced from the daily payload's daily_ml_activity. Relocated off the Daily
+// tab to the System page (2026-06-02) where it sits next to ML Buy-Path Health;
+// on Daily it was the heaviest block and pushed the actual buy/sell actions
+// below the fold.
+function renderMlActivityPanel(mlAct) {
+    if (!mlAct || !Array.isArray(mlAct.daily_loops)) return '';
+    const statusToColor = {
+        healthy: 'positive', degraded: 'negative',
+        stale: 'neutral', unknown: 'neutral',
+    };
+    const headerColor = statusToColor[mlAct.overall_status] || 'neutral';
+    const fr = mlAct.full_retrain || {};
+    const inc = mlAct.incremental_update || {};
+    const loopRows = mlAct.daily_loops.map(l => {
+        const dotColor = l.ok && l.fresh ? '#22c55e'
+                       : (l.ok ? '#f59e0b' : '#ef4444');
+        return `<div style="display:flex;gap:8px;align-items:baseline;font-size:12px;line-height:1.5">
+            <span style="color:${dotColor}">●</span>
+            <span style="color:var(--text-secondary);min-width:170px;flex-shrink:0">${l.label}</span>
+            <span style="color:var(--text-primary);flex:1">${l.friendly_status || '—'}</span>
+        </div>`;
+    }).join('');
+    return `
+        <div class="card" style="grid-column:1 / -1">
+            <div class="card-header">
+                <div class="card-title">ML Activity (last 24h)</div>
+                <span class="pill pill-${headerColor === 'positive' ? 'green' : headerColor === 'negative' ? 'red' : 'blue'}" style="font-size:11px">
+                    ${(mlAct.overall_status || 'unknown').toUpperCase()}
+                </span>
+            </div>
+            <div class="card-value ${headerColor}" style="font-size:14px;line-height:1.4;font-weight:500">
+                ${mlAct.summary_line || ''}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px">
+                <div>
+                    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Full retrain</div>
+                    <div style="font-size:12px">${fr.friendly_status || fr.status || '—'}</div>
+                </div>
+                <div>
+                    <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px">Incremental update</div>
+                    <div style="font-size:12px">${inc.friendly_status || '—'}</div>
+                </div>
+            </div>
+            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border, rgba(255,255,255,0.08));display:flex;flex-direction:column;gap:4px">
+                ${loopRows}
+            </div>
+            <div style="margin-top:10px;font-size:11px;color:var(--text-secondary)">
+                Full retrain is throttled to ~monthly by design (REFIT_CADENCE_DAYS=21).
+                Daily learning happens via the 5 loops above + the post-scan incremental update.
+            </div>
+        </div>`;
+}
+
 Router.register('/system', async () => {
     const data = await API.system();
     if (!data) return '<p>Failed to load</p>';
     const incidents = await API.incidents().catch(() => null);
+    // ML Activity (last 24h) panel relocated here from the Daily tab. Its data
+    // (daily_ml_activity) only ships in the daily payload, so fetch it softly.
+    const mlActivity = await API.daily().then(d => (d && d.daily_ml_activity) || null).catch(() => null);
 
     // ── Incidents (open + recently resolved) ───────────────────────
     const incHtml = (() => {
@@ -2664,6 +2653,7 @@ Router.register('/system', async () => {
     // one-line diagnosis. New backend field: data.ml_health. The lookback
     // selector re-fetches via the dedicated dashboard/admin/ml-status endpoint.
     const mlHealthHtml = data.ml_health ? renderMlHealthTile(data.ml_health) : '';
+    const mlActivityHtml = renderMlActivityPanel(mlActivity);
 
     const sources = [];
     if (model.has_llm) sources.push('LLM');
@@ -2716,6 +2706,7 @@ Router.register('/system', async () => {
         ${jobsSummaryHtml}
         ${dataHealthHtml}
         ${mlHealthHtml}
+        ${mlActivityHtml}
     </div>
 
     <div class="table-container">

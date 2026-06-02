@@ -114,6 +114,16 @@ function dailyData(overrides = {}) {
         training: {},
         model: { version: '1.2.0', accuracy: 0.61 },
         conviction: [{ symbol: 'NVDA', appearances: 3, actionable_count: 2, latest_score: 88, trend: 'up' }],
+        daily_ml_activity: {
+            overall_status: 'healthy',
+            summary_line: '🟢 ML healthy — 5/5 loops fresh',
+            full_retrain: { friendly_status: 'last ran 3d ago' },
+            incremental_update: { friendly_status: 'ran after today\'s scan' },
+            daily_loops: [
+                { label: 'Sentiment refresh', ok: true, fresh: true, friendly_status: 'ran 2h ago' },
+                { label: 'Feature rebuild', ok: true, fresh: false, friendly_status: 'ran 20h ago' },
+            ],
+        },
         fusion: {
             available: true,
             snapshot_date: '2026-06-01',
@@ -282,6 +292,12 @@ async function main() {
         const c = assertIncludes('daily: fusion promotion row', html, 'AMD');
         const d = assertIncludes('daily: fusion symbol row', html, 'NVDA');
         if (a && b && c && d) ok('daily: Buy-Tier Fusion panel renders tiers + promotions from data.fusion');
+        // Decluttering (2026-06-02): ML Activity panel + ML Model KPI card were
+        // relocated/removed; assert they no longer appear on the Daily tab even
+        // though daily_ml_activity is still present in the payload.
+        const e = assertExcludes('daily: ML Activity panel relocated to System', html, 'ML Activity (last 24h)');
+        const f = assertExcludes('daily: ML Model KPI card removed', html, '>ML Model<');
+        if (e && f) ok('daily: ML-ops cruft (ML Activity panel + ML Model card) removed from Daily');
     } catch (e) { fail('daily render', e.stack || String(e)); }
 
     // 1b) Daily — fusion hidden when unavailable (graceful empty state)
@@ -298,6 +314,7 @@ async function main() {
     try {
         API.system = async () => systemData();
         API.incidents = async () => ({ open: [], resolved_recent: [] });
+        API.daily = async () => dailyData();
         const html = await handler('/system')();
         const a = assertIncludes('system: ml-health tile heading', html, 'ML Buy-Path Health');
         const b = assertIncludes('system: ml-health coverage value', html, '42%');
@@ -305,6 +322,9 @@ async function main() {
         const d = assertIncludes('system: ml-health tile id', html, 'id="ml-health-tile"');
         const e = assertIncludes('system: ml-health lookback selector', html, '_reloadMlHealth(30)');
         if (a && b && c && d && e) ok('system: ML Buy-Path Health tile renders coverage + diagnosis + lookback selector from data.ml_health');
+        const f = assertIncludes('system: ML Activity panel relocated here', html, 'ML Activity (last 24h)');
+        const g = assertIncludes('system: ML Activity loop row', html, 'Sentiment refresh');
+        if (f && g) ok('system: ML Activity (last 24h) panel renders from daily_ml_activity (relocated from Daily)');
     } catch (e) { fail('system render', e.stack || String(e)); }
 
     // 2c) System — lookback selector refetches via API.mlStatus and swaps the tile
