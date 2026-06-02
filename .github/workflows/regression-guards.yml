@@ -14,5 +14,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+      - name: Install dev dependencies (jsdom for render smoke tests)
+        run: npm ci
       - name: Run regression guards
         run: node tests/regression-guards.mjs
+      - name: Run render smoke tests
+        run: node tests/render-smoke.test.mjs

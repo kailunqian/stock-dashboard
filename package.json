@@ -1,0 +1,16 @@
+{
+  "name": "stock-dashboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "StockAnalysis dashboard SPA — static front-end with Node-based guards/tests.",
+  "scripts": {
+    "test": "node tests/regression-guards.mjs && node tests/render-smoke.test.mjs",
+    "test:guards": "node tests/regression-guards.mjs",
+    "test:render": "node tests/render-smoke.test.mjs",
+    "cache-bust": "node scripts/sync-cache-bust.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.0"
+  }
+}
