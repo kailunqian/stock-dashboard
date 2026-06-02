@@ -1189,6 +1189,79 @@ Router.register('/daily', async () => {
         }
     }
 
+    // ── Buy-Tier Fusion panel (Phase J5) ───────────────────────────────
+    // Cross-sectional ranking fused with absolute composite scores. Surfaces
+    // the tiered buy list the backend now produces nightly
+    // (daily_fusion_summary). Hidden when the fusion table is empty so the
+    // page still degrades cleanly on a fresh/empty environment.
+    let fusionPanelHtml = '';
+    const fusion = data.fusion;
+    if (fusion && fusion.available) {
+        const tierMeta = {
+            'Strong Buy + Top Decile': { color: '#a855f7', emoji: '🏆' },
+            'Strong Buy':              { color: '#22c55e', emoji: '🟢' },
+            'Cross-Sectional Watch':   { color: '#60a5fa', emoji: '👀' },
+            'Watchlist Promotion':     { color: '#f59e0b', emoji: '⭐' },
+        };
+        const fnum = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
+        const pctOrDash = (v) => (typeof v === 'number' && isFinite(v)) ? `${(v * 100).toFixed(0)}%` : '—';
+        const countPills = Object.entries(fusion.tier_counts || {}).map(([t, n]) =>
+            `<span class="pill pill-blue">${t}: ${n}</span>`).join(' ');
+        const fusionRow = (r) => {
+            const score = r.composite_score != null ? Math.round(r.composite_score) : null;
+            const ring = score != null
+                ? `<div class="score-ring ${score >= 85 ? 'success' : score >= 70 ? '' : 'danger'}" style="--score:${score};--size:34px"><span>${score}</span></div>`
+                : '—';
+            const rank = pctOrDash(r.cross_sectional_rank);
+            const gates = `${r.abs_pass ? '✅' : '⬜'} abs · ${r.rank_pass ? '✅' : '⬜'} rank`;
+            const univ = r.in_focused_universe ? 'Focused' : (r.in_sp500 ? 'S&P 500' : '—');
+            return `<tr onclick="window.location.hash='#/stock/${r.symbol}'" style="cursor:pointer">
+                <td><strong>${r.symbol}</strong></td>
+                <td>${ring}</td>
+                <td>${rank}</td>
+                <td class="hide-mobile">${univ}</td>
+                <td class="hide-mobile" style="color:var(--text-secondary);font-size:12px">${gates}</td>
+            </tr>`;
+        };
+        const tierTable = (name, rows) => {
+            if (!rows || !rows.length) return '';
+            const meta = tierMeta[name] || { color: 'var(--text-secondary)', emoji: '•' };
+            return `
+            <div class="table-container" style="margin-bottom:14px;border:1px solid ${meta.color}">
+                <div class="table-header" style="display:flex;align-items:center;gap:10px">
+                    <span style="color:${meta.color};font-weight:600">${meta.emoji} ${name}</span>
+                    <span class="pill pill-blue" style="margin-left:auto">${rows.length}</span>
+                </div>
+                <table class="picks-table">
+                    <thead><tr><th>Symbol</th><th>Score</th><th>X-rank</th>
+                        <th class="hide-mobile">Universe</th><th class="hide-mobile">Gates</th></tr></thead>
+                    <tbody>${rows.map(fusionRow).join('')}</tbody>
+                </table>
+            </div>`;
+        };
+        const tierTables = ['Strong Buy + Top Decile', 'Strong Buy', 'Cross-Sectional Watch']
+            .map(t => tierTable(t, (fusion.tiers || {})[t])).join('');
+        const promoTable = tierTable('Watchlist Promotion', fusion.watchlist_promotions || []);
+        fusionPanelHtml = `
+        <div style="display:flex;align-items:baseline;gap:10px;margin:22px 0 10px">
+            <div style="font-size:18px;font-weight:600">Buy-Tier Fusion</div>
+            <div style="color:var(--text-secondary);font-size:13px">Cross-sectional ranking × absolute composite · snapshot ${fusion.snapshot_date || '—'}</div>
+        </div>
+        <div class="glass" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            ${countPills || '<span style="color:var(--text-secondary)">No tiered picks in latest snapshot</span>'}
+            <span style="margin-left:auto;font-size:12px;color:var(--text-secondary)">
+                abs ≥ ${fnum(fusion.absolute_threshold)} · rank ≥ ${pctOrDash(fusion.rank_threshold)}
+            </span>
+        </div>
+        ${tierTables}${promoTable}
+        <p style="color:var(--text-secondary);font-size:12px;margin:-4px 0 18px">
+            <strong>Fusion</strong> combines each name's absolute composite score with its
+            <em>cross-sectional rank</em> vs the scanned universe. A name clears a tier when it passes
+            the absolute gate, the rank gate, or both. Watchlist promotions rank strongly relative to
+            peers even when the absolute composite is thin. Not financial advice.
+        </p>`;
+    }
+
     return `
     <div class="hero">
         <span class="page-eyebrow">Daily Report · ${timeSince(scan.scanned_at)}</span>
@@ -1231,6 +1304,7 @@ Router.register('/daily', async () => {
     </div>
 
     ${actionPanelHtml}
+    ${fusionPanelHtml}
     ${lockedTeaserHtml}`;
 });
 
@@ -1839,6 +1913,32 @@ Router.register('/performance', async () => {
         }
     }
 
+    // Live-vs-backtest accuracy split (new backend field accuracy_breakdown)
+    // — transparency on whether the hit-rate is earned on real forward picks
+    // or backtest replay rows.
+    let accuracyBreakdownHtml = '';
+    const ab = data.accuracy_breakdown;
+    if (ab && (ab.live || ab.backtest || ab.combined)) {
+        const seg = (label, o, color) => {
+            if (!o) return '';
+            const hr = typeof o.hit_rate === 'number' ? (o.hit_rate * 100).toFixed(0) + '%' : '—';
+            const n = o.with_outcomes != null ? o.with_outcomes : o.total;
+            return `
+            <div class="weight-bar-container">
+                <div class="weight-bar-label"><span>${label}</span><span>${hr} (${n}/${o.total})</span></div>
+                <div class="weight-bar"><div class="weight-bar-fill ${color}" style="width:${typeof o.hit_rate === 'number' ? o.hit_rate * 100 : 0}%"></div></div>
+            </div>`;
+        };
+        accuracyBreakdownHtml = `
+        <div class="card">
+            <div class="card-title">Accuracy — Live vs Backtest</div>
+            ${seg('Live (forward picks)', ab.live, 'technical')}
+            ${seg('Backtest', ab.backtest, 'fundamental')}
+            ${seg('Combined', ab.combined, 'momentum')}
+            <div style="font-size:12px;color:var(--text-secondary);margin-top:8px">7-day hit rate. Live = real signals scored after the fact; backtest = historical replay.</div>
+        </div>`;
+    }
+
     return `
     <div class="page-title">Performance</div>
     ${headlineKpiHtml}
@@ -1858,6 +1958,7 @@ Router.register('/performance', async () => {
             <div class="card-grid">
                 ${modelHtml}
                 ${scorerHtml}
+                ${accuracyBreakdownHtml}
             </div>
             ${walkForwardHtml}
             ${signalAccuracyHtml}
@@ -2009,12 +2110,9 @@ function renderPerformanceCharts(metrics) {
 }
 
 // ── Stock Detail Page (Decision Flow) ───────────────────────────────
-
-Router.register('/stock', async () => {
-    return `<div class="card" style="text-align:center;padding:40px">
-        <p>Enter a stock symbol in the URL: <code>#/stock/NVDA</code></p>
-    </div>`;
-});
+// Reached only via #/stock/:symbol (handled by the dynamic router below);
+// renderStockDetail() does the work. The old bare-#/stock placeholder route
+// was removed — it was a dead stub that no link ever pointed to.
 
 // Dynamic stock route handler
 // ── LWC chart helper (Tier 1: TradingView Lightweight Charts) ─────
@@ -2474,6 +2572,42 @@ Router.register('/system', async () => {
             <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Per-worker sample · candidates filed as incidents</div>
         </div>`;
 
+    // ── ML buy-path health tile ─────────────────────────────────────
+    // Surfaces *why* champion_p_hit may be NULL: the runtime gate, champion
+    // manifest presence, p_hit coverage over the lookback window, and a
+    // one-line diagnosis. New backend field: data.ml_health.
+    const mlh = data.ml_health || {};
+    let mlHealthHtml = '';
+    if (mlh && !mlh.error) {
+        const rf = mlh.runtime_flags || {};
+        const cf = mlh.config_flags || {};
+        const cm = mlh.champion_model || {};
+        const cov = mlh.db_coverage || {};
+        const covPct = typeof cov.champion_p_hit_coverage_pct === 'number' ? cov.champion_p_hit_coverage_pct : null;
+        const healthy = !!(rf.ADAPTIVE_ML_ENABLED && !rf.ADAPTIVE_ML_KILL_SWITCH && cm.present && covPct > 0 && cf.ml_buy_union_enabled);
+        const covClass = covPct == null ? 'neutral' : (covPct > 0 ? 'positive' : 'negative');
+        const flagPill = (on, label) => `<span class="pill pill-${on ? 'green' : 'red'}">${on ? '✅' : '⬜'} ${label}</span>`;
+        mlHealthHtml = `
+        <div class="card" style="grid-column:1 / -1">
+            <div class="card-header">
+                <div class="card-title">ML Buy-Path Health</div>
+                <span class="pill pill-${healthy ? 'green' : 'yellow'}" style="font-size:11px">${healthy ? 'LIVE' : 'CHECK'}</span>
+            </div>
+            <div class="card-value ${covClass}" style="font-size:28px">${covPct != null ? covPct.toFixed(0) + '%' : '—'}</div>
+            <div class="card-subtitle">champion_p_hit coverage · last ${mlh.lookback_days || '?'}d (${cov.champion_p_hit_non_null ?? '?'}/${cov.predictions_total ?? '?'} predictions)</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">
+                ${flagPill(rf.ADAPTIVE_ML_ENABLED, 'ML enabled')}
+                ${flagPill(!rf.ADAPTIVE_ML_KILL_SWITCH, 'kill-switch clear')}
+                ${flagPill(cm.present, 'champion model')}
+                ${flagPill(cf.ml_buy_union_enabled, 'buy union')}
+            </div>
+            ${cm.present ? `<div style="font-size:13px;color:var(--text-secondary);margin-top:10px">
+                Champion v${cm.version || '?'}${typeof cm.auc === 'number' ? ` · AUC ${cm.auc.toFixed(3)}` : ''}${cm.trained_at ? ` · trained ${timeSince(cm.trained_at)}` : ''}
+            </div>` : ''}
+            ${mlh.diagnosis ? `<div style="font-size:12px;color:var(--text-secondary);margin-top:8px;font-style:italic;line-height:1.5">${mlh.diagnosis}</div>` : ''}
+        </div>`;
+    }
+
     const sources = [];
     if (model.has_llm) sources.push('LLM');
     if (model.has_fq) sources.push('FQ');
@@ -2524,6 +2658,7 @@ Router.register('/system', async () => {
         </div>` : ''}
         ${jobsSummaryHtml}
         ${dataHealthHtml}
+        ${mlHealthHtml}
     </div>
 
     <div class="table-container">
