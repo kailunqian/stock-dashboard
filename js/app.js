@@ -972,12 +972,15 @@ Router.register('/daily', async () => {
     //   1. Legacy tier (p.recommendation): Strong Buy / Buy / Cautious Buy / Lean Buy / Squeeze Opportunity / Watch / …
     //   2. v2 conviction tier (p.score_breakdown.v2_tier): Strong Buy / Buy / null
     //      v2 is a precision overlay — only fires when catalyst+pillars+composite all align.
-    // Partition rules:
-    //   v2_tier in {Strong Buy, Buy} AND legacy in BUY-family → 🔥 HIGH CONVICTION (both agree)
-    //   legacy in BUY-family, v2 silent, not previously bought → 🛒 BUY (new entry)
-    //   legacy in BUY-family, v2 silent, previously bought    → ✅ KEEP (reaffirmed)
-    //   legacy in WATCH                                       → 👀 WATCH (informational)
-    //   previously bought AND now weak                        → ⚠️ TRIM/SELL
+    // Partition rules (2026-06-02: merged BUY + KEEP into one actionable list —
+    // they were the SAME buy signal split only by an internal recurrence flag,
+    // which the old "assumed held" label wrongly implied was the user's holding):
+    //   v2_tier in {Strong Buy, Buy} AND core in BUY-family → 🔥 HIGH CONVICTION (both agree)
+    //   core in BUY-family, v2 silent                       → 🛒 BUY (New / Recurring badge per row)
+    //   core in WATCH                                       → 👀 WATCH (informational)
+    //   recurring actionable AND now weak                   → ⚠️ TRIM/SELL
+    // "core" = the primary 5-pillar composite + risk scorer (was labelled
+    // "legacy" — it is NOT deprecated). "v2" = stricter precision overlay.
     const BUY_TIERS = new Set(['Strong Buy', 'Buy', 'Cautious Buy', 'Lean Buy', 'Squeeze Opportunity']);
     const WATCH_TIERS = new Set(['Watch']);
     const V2_BUY_TIERS = new Set(['Strong Buy', 'Buy']);
@@ -988,20 +991,19 @@ Router.register('/daily', async () => {
 
     const highConvictionList = [];
     const buyList = [];
-    const keepList = [];
     const watchList = [];
     const sellList = [];
     for (const p of (scan.top_picks || [])) {
         const c = convBySym[p.symbol] || {};
-        const wasBuy = (c.actionable_count || 0) >= 1;
+        const recurring = (c.actionable_count || 0) >= 1;
         const tier = p.recommendation || '';
         const v2Tier = (p.score_breakdown && p.score_breakdown.v2_tier) || null;
         const v2Path = (p.score_breakdown && p.score_breakdown.v2_path) || null;
         const v2Hit = v2Tier && V2_BUY_TIERS.has(v2Tier);
         if (BUY_TIERS.has(tier) && v2Hit) {
-            highConvictionList.push({ pick: p, conv: c, v2Tier, v2Path });
+            highConvictionList.push({ pick: p, conv: c, v2Tier, v2Path, recurring });
         } else if (BUY_TIERS.has(tier)) {
-            (wasBuy ? keepList : buyList).push({ pick: p, conv: c });
+            buyList.push({ pick: p, conv: c, recurring });
         } else if (WATCH_TIERS.has(tier)) {
             watchList.push({ pick: p, conv: c });
         }
@@ -1009,9 +1011,9 @@ Router.register('/daily', async () => {
     }
     for (const c of conviction) {
         if (todayPickSyms.has(c.symbol)) continue;
-        const wasBuy = (c.actionable_count || 0) >= 1;
+        const recurring = (c.actionable_count || 0) >= 1;
         const weakened = (c.latest_score || 0) < 70 || c.trend === 'down';
-        if (wasBuy && weakened) sellList.push(c);
+        if (recurring && weakened) sellList.push(c);
     }
 
     const trendIcon = t => t === 'up' ? '📈' : t === 'down' ? '📉' : '➡️';
@@ -1027,14 +1029,20 @@ Router.register('/daily', async () => {
         const v2Badge = (kind === 'high')
             ? `<span class="pill" style="background:#7c3aed;color:#fff;font-size:11px" title="v2 conviction tier (precision overlay): ${item.v2Tier}${item.v2Path ? ' via ' + item.v2Path : ''}">v2 ${item.v2Tier}${item.v2Path ? ' · ' + item.v2Path : ''}</span>`
             : '';
+        // New vs Recurring badge: recurring = the system flagged this symbol as
+        // actionable on a prior scan day (NOT a claim that the user holds it).
+        const heldBadge = (kind === 'high' || kind === 'buy')
+            ? (item.recurring
+                ? `<span class="pill" style="background:rgba(96,165,250,0.18);color:#60a5fa;font-size:11px" title="Flagged actionable on ${c.actionable_count || '?'} of the last ${c.appearances || '?'} scans — recurring conviction, not a holdings record">🔁 Recurring</span>`
+                : `<span class="pill" style="background:rgba(34,197,94,0.18);color:#22c55e;font-size:11px" title="First time on the buy list in the recent window">🆕 New</span>`)
+            : '';
         const days = c.actionable_count != null ? `${c.actionable_count}/${c.appearances || '?'} days` : '—';
         const trend = c.trend ? `${trendIcon(c.trend)} ${c.trend}` : '—';
         const entry = p.buy_price ? `$${p.buy_price.toFixed(2)}` : (p.current_price ? `$${p.current_price.toFixed(2)}` : '—');
         const target = p.target_short ? `$${p.target_short.toFixed(2)}` : '—';
         const stop = p.stop_loss ? `$${p.stop_loss.toFixed(2)}` : '—';
         let note = kind === 'high' ? 'Both scorers agree — strongest signal'
-            : kind === 'buy' ? 'New entry'
-            : kind === 'keep' ? 'Reaffirmed today'
+            : kind === 'buy' ? (item.recurring ? 'Buy tier — recurring conviction' : 'Buy tier — new entry')
             : kind === 'watch' ? 'Observe — do not buy yet'
             : 'Weakened';
         // 2026-05-18: surface near-miss diagnostic when a Watch pick had high
@@ -1044,7 +1052,7 @@ Router.register('/daily', async () => {
             note = `<span title="${p.near_miss_text}">${p.near_miss_text}</span>`;
         }
         return `<tr onclick="window.location.hash='#/stock/${sym}'" style="cursor:pointer">
-            <td><strong>${sym}</strong>${v2Badge ? ' ' + v2Badge : ''}</td>
+            <td><strong>${sym}</strong>${v2Badge ? ' ' + v2Badge : ''}${heldBadge ? ' ' + heldBadge : ''}</td>
             <td>${tierPill}</td>
             <td>${ring}</td>
             <td>${trend}</td>
@@ -1085,15 +1093,14 @@ Router.register('/daily', async () => {
         <div style="font-size:18px;font-weight:600">Actions for today</div>
         <div style="color:var(--text-secondary);font-size:13px">By system tier × v2 precision overlay × rolling multi-day signals</div>
     </div>
-    ${actionSection('🔥 HIGH CONVICTION — both scorers agree (legacy Buy AND v2 Buy)', highConvictionList, 'high', 'No high-conviction picks today (v2 stayed silent)', '#a855f7', 'rgba(168,85,247,0.06)')}
-    ${actionSection('🛒 BUY — legacy Buy tier, v2 silent, not previously held', buyList, 'buy', 'No new buys today', 'var(--accent-green, #22c55e)')}
-    ${actionSection('✅ KEEP — Buy tier reaffirmed (assumed held from prior buys)', keepList, 'keep', 'Nothing previously bought is in today\'s buy tier', 'var(--accent-blue, #60a5fa)')}
+    ${actionSection('🔥 HIGH CONVICTION — both scorers agree (core Buy AND v2 Buy)', highConvictionList, 'high', 'No high-conviction picks today (v2 stayed silent)', '#a855f7', 'rgba(168,85,247,0.06)')}
+    ${actionSection('🛒 BUY — core Buy tier (🆕 new or 🔁 recurring conviction)', buyList, 'buy', 'No buys today', 'var(--accent-green, #22c55e)')}
     ${actionSection('👀 WATCH — promising but do NOT buy yet (risk-reward not justified)', watchList, 'watch', 'Nothing on watch today', 'var(--text-secondary)')}
-    ${actionSection('⚠️ TRIM/SELL — previously bought, now weakened', sellList, 'sell', 'No previously-bought stocks have weakened', 'var(--accent-yellow, #f59e0b)')}
+    ${actionSection('⚠️ TRIM/SELL — previously flagged, now weakened', sellList, 'sell', 'Nothing previously flagged has weakened', 'var(--accent-yellow, #f59e0b)')}
     <p style="color:var(--text-secondary);font-size:12px;margin:-8px 0 18px">
-        <strong>High Conviction</strong> = both legacy scorer (composite + risks) and v2 conviction scorer (catalyst/breakout + 5-pillar consensus + ML p_hit gate) flag the same name. Highest precision signal we produce today.<br>
-        <strong>Tier</strong> comes from the legacy scorer. Watch = score may be high but risk/reward is too thin to enter — observe only.
-        Assumed portfolio = stocks the system marked as Buy on prior days. Not financial advice.
+        <strong>High Conviction</strong> = both the core scorer (5-pillar composite + risks) and the v2 conviction scorer (catalyst/breakout + 5-pillar consensus + ML p_hit gate) flag the same name. Highest precision signal we produce today.<br>
+        <strong>Tier</strong> comes from the core scorer. Watch = score may be high but risk/reward is too thin to enter — observe only.
+        <strong>🔁 Recurring</strong> = the system flagged this symbol as actionable on a prior scan day (a conviction signal, NOT a record of what you own). Not financial advice.
     </p>`;
 
     // Today's Macro card — cross-cutting MarketNarrative themes
