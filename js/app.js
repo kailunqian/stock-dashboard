@@ -989,6 +989,20 @@ Router.register('/daily', async () => {
     const convBySym = {};
     for (const c of conviction) convBySym[c.symbol] = c;
 
+    // Top-decile set: symbols that ALSO cleared the cross-sectional factor
+    // rank (the one useful signal folded in from the retired standalone J5
+    // digest). A core Buy that is also top-decile = both the absolute scorer
+    // and the market-relative model agree → 🏅 badge on the row.
+    const topDecileSyms = new Set();
+    const _fusion = data.fusion;
+    if (_fusion && _fusion.available && _fusion.tiers) {
+        for (const tierName of Object.keys(_fusion.tiers)) {
+            for (const r of (_fusion.tiers[tierName] || [])) {
+                if (r && r.rank_pass && r.symbol) topDecileSyms.add(String(r.symbol).toUpperCase());
+            }
+        }
+    }
+
     const highConvictionList = [];
     const buyList = [];
     const watchList = [];
@@ -1037,6 +1051,11 @@ Router.register('/daily', async () => {
                 : `<span class="pill" style="background:rgba(34,197,94,0.18);color:#22c55e;font-size:11px" title="First time on the buy list in the recent window">🆕 New</span>`)
             : '';
         const days = c.actionable_count != null ? `${c.actionable_count}/${c.appearances || '?'} days` : '—';
+        // 🏅 Top-decile: pick also cleared the cross-sectional factor rank
+        // (folded-in J5 signal). Only meaningful on buyable rows.
+        const topDecileBadge = ((kind === 'high' || kind === 'buy') && sym && topDecileSyms.has(String(sym).toUpperCase()))
+            ? `<span class="pill" style="background:rgba(245,158,11,0.18);color:#f59e0b;font-size:11px" title="Also top-decile in the cross-sectional factor model — the absolute scorer and the market-relative model agree">🏅 Top-decile</span>`
+            : '';
         const trend = c.trend ? `${trendIcon(c.trend)} ${c.trend}` : '—';
         const entry = p.buy_price ? `$${p.buy_price.toFixed(2)}` : (p.current_price ? `$${p.current_price.toFixed(2)}` : '—');
         const target = p.target_short ? `$${p.target_short.toFixed(2)}` : '—';
@@ -1052,7 +1071,7 @@ Router.register('/daily', async () => {
             note = `<span title="${p.near_miss_text}">${p.near_miss_text}</span>`;
         }
         return `<tr onclick="window.location.hash='#/stock/${sym}'" style="cursor:pointer">
-            <td><strong>${sym}</strong>${v2Badge ? ' ' + v2Badge : ''}${heldBadge ? ' ' + heldBadge : ''}</td>
+            <td><strong>${sym}</strong>${v2Badge ? ' ' + v2Badge : ''}${heldBadge ? ' ' + heldBadge : ''}${topDecileBadge ? ' ' + topDecileBadge : ''}</td>
             <td>${tierPill}</td>
             <td>${ring}</td>
             <td>${trend}</td>
