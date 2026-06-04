@@ -993,12 +993,24 @@ Router.register('/daily', async () => {
     // rank (the one useful signal folded in from the retired standalone J5
     // digest). A core Buy that is also top-decile = both the absolute scorer
     // and the market-relative model agree → 🏅 badge on the row.
+    // Cross-reference the cross-sectional fusion snapshot into the action rows
+    // so each pick carries its market-relative rank inline (🏅 + X-rank %). The
+    // full fusion list is then deduped below into "Cross-Sectional Standouts" —
+    // only the names it ranks that AREN'T already in today's actions.
     const topDecileSyms = new Set();
+    const fusionRankBySym = new Map();
     const _fusion = data.fusion;
-    if (_fusion && _fusion.available && _fusion.tiers) {
-        for (const tierName of Object.keys(_fusion.tiers)) {
-            for (const r of (_fusion.tiers[tierName] || [])) {
-                if (r && r.rank_pass && r.symbol) topDecileSyms.add(String(r.symbol).toUpperCase());
+    if (_fusion && _fusion.available) {
+        const _allFusionRows = [
+            ...Object.values(_fusion.tiers || {}).flat(),
+            ...(_fusion.watchlist_promotions || []),
+        ];
+        for (const r of _allFusionRows) {
+            if (!r || !r.symbol) continue;
+            const key = String(r.symbol).toUpperCase();
+            if (r.rank_pass) topDecileSyms.add(key);
+            if (typeof r.cross_sectional_rank === 'number' && !fusionRankBySym.has(key)) {
+                fusionRankBySym.set(key, r.cross_sectional_rank);
             }
         }
     }
@@ -1054,7 +1066,11 @@ Router.register('/daily', async () => {
         // 🏅 Top-decile: pick also cleared the cross-sectional factor rank
         // (folded-in J5 signal). Only meaningful on buyable rows.
         const topDecileBadge = ((kind === 'high' || kind === 'buy') && sym && topDecileSyms.has(String(sym).toUpperCase()))
-            ? `<span class="pill" style="background:rgba(245,158,11,0.18);color:#f59e0b;font-size:11px" title="Also top-decile in the cross-sectional factor model — the absolute scorer and the market-relative model agree">🏅 Top-decile</span>`
+            ? (() => {
+                const xr = fusionRankBySym.get(String(sym).toUpperCase());
+                const xrPct = (typeof xr === 'number' && isFinite(xr)) ? `${(xr * 100).toFixed(0)}%` : null;
+                return `<span class="pill" style="background:rgba(245,158,11,0.18);color:#f59e0b;font-size:11px" title="Also top-decile in the cross-sectional factor model — the absolute scorer and the market-relative model agree${xrPct ? ` (cross-sectional rank ${xrPct})` : ''}">🏅 Top-decile${xrPct ? ` · X-rank ${xrPct}` : ''}</span>`;
+            })()
             : '';
         const trend = c.trend ? `${trendIcon(c.trend)} ${c.trend}` : '—';
         const entry = p.buy_price ? `$${p.buy_price.toFixed(2)}` : (p.current_price ? `$${p.current_price.toFixed(2)}` : '—');
@@ -1152,77 +1168,91 @@ Router.register('/daily', async () => {
         }
     }
 
-    // ── Buy-Tier Fusion panel (Phase J5) ───────────────────────────────
-    // Cross-sectional ranking fused with absolute composite scores. Surfaces
-    // the tiered buy list the backend now produces nightly
-    // (daily_fusion_summary). Hidden when the fusion table is empty so the
-    // page still degrades cleanly on a fresh/empty environment.
+    // ── Cross-Sectional Standouts (deduped fusion) ─────────────────────
+    // The cross-sectional fusion snapshot is already folded into the action
+    // rows above (🏅 X-rank). Here we surface ONLY the names it ranks that are
+    // NOT already in today's actions — the genuinely additive signal: peers
+    // that rank strongly vs the universe even if they missed the action gates.
+    // Hidden when fusion is unavailable; collapses to a one-line "agrees" note
+    // when every ranked name is already in the actions above.
     let fusionPanelHtml = '';
     const fusion = data.fusion;
     if (fusion && fusion.available) {
+        const actionSyms = new Set();
+        for (const it of [...highConvictionList, ...buyList, ...watchList]) {
+            const s = (it.pick || {}).symbol;
+            if (s) actionSyms.add(String(s).toUpperCase());
+        }
+        for (const c of sellList) {
+            if (c.symbol) actionSyms.add(String(c.symbol).toUpperCase());
+        }
+        const isStandout = (r) => r && r.symbol && !actionSyms.has(String(r.symbol).toUpperCase());
+
+        const fnum = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
+        const pctOrDash = (v) => (typeof v === 'number' && isFinite(v)) ? `${(v * 100).toFixed(0)}%` : '—';
         const tierMeta = {
             'Strong Buy + Top Decile': { color: '#a855f7', emoji: '🏆' },
             'Strong Buy':              { color: '#22c55e', emoji: '🟢' },
             'Cross-Sectional Watch':   { color: '#60a5fa', emoji: '👀' },
             'Watchlist Promotion':     { color: '#f59e0b', emoji: '⭐' },
         };
-        const fnum = (v, d = 2) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
-        const pctOrDash = (v) => (typeof v === 'number' && isFinite(v)) ? `${(v * 100).toFixed(0)}%` : '—';
-        const countPills = Object.entries(fusion.tier_counts || {}).map(([t, n]) =>
-            `<span class="pill pill-blue">${t}: ${n}</span>`).join(' ');
         const fusionRow = (r) => {
             const score = r.composite_score != null ? Math.round(r.composite_score) : null;
             const ring = score != null
                 ? `<div class="score-ring ${score >= 85 ? 'success' : score >= 70 ? '' : 'danger'}" style="--score:${score};--size:34px"><span>${score}</span></div>`
                 : '—';
-            const rank = pctOrDash(r.cross_sectional_rank);
             const gates = `${r.abs_pass ? '✅' : '⬜'} abs · ${r.rank_pass ? '✅' : '⬜'} rank`;
             const univ = r.in_focused_universe ? 'Focused' : (r.in_sp500 ? 'S&P 500' : '—');
             return `<tr onclick="window.location.hash='#/stock/${r.symbol}'" style="cursor:pointer">
                 <td><strong>${r.symbol}</strong></td>
                 <td>${ring}</td>
-                <td>${rank}</td>
+                <td>${pctOrDash(r.cross_sectional_rank)}</td>
                 <td class="hide-mobile">${univ}</td>
                 <td class="hide-mobile" style="color:var(--text-secondary);font-size:12px">${gates}</td>
             </tr>`;
         };
         const tierTable = (name, rows) => {
-            if (!rows || !rows.length) return '';
+            const standouts = (rows || []).filter(isStandout);
+            if (!standouts.length) return '';
             const meta = tierMeta[name] || { color: 'var(--text-secondary)', emoji: '•' };
             return `
             <div class="table-container" style="margin-bottom:14px;border:1px solid ${meta.color}">
                 <div class="table-header" style="display:flex;align-items:center;gap:10px">
                     <span style="color:${meta.color};font-weight:600">${meta.emoji} ${name}</span>
-                    <span class="pill pill-blue" style="margin-left:auto">${rows.length}</span>
+                    <span class="pill pill-blue" style="margin-left:auto">${standouts.length}</span>
                 </div>
                 <table class="picks-table">
                     <thead><tr><th>Symbol</th><th>Score</th><th>X-rank</th>
                         <th class="hide-mobile">Universe</th><th class="hide-mobile">Gates</th></tr></thead>
-                    <tbody>${rows.map(fusionRow).join('')}</tbody>
+                    <tbody>${standouts.map(fusionRow).join('')}</tbody>
                 </table>
             </div>`;
         };
         const tierTables = ['Strong Buy + Top Decile', 'Strong Buy', 'Cross-Sectional Watch']
             .map(t => tierTable(t, (fusion.tiers || {})[t])).join('');
         const promoTable = tierTable('Watchlist Promotion', fusion.watchlist_promotions || []);
+        const hasStandouts = !!(tierTables || promoTable);
+        const thresholdLine = `abs ≥ ${fnum(fusion.absolute_threshold)} · rank ≥ ${pctOrDash(fusion.rank_threshold)}`;
         fusionPanelHtml = `
         <div style="display:flex;align-items:baseline;gap:10px;margin:22px 0 10px">
-            <div style="font-size:18px;font-weight:600">Buy-Tier Fusion</div>
-            <div style="color:var(--text-secondary);font-size:13px">Cross-sectional ranking × absolute composite · snapshot ${fusion.snapshot_date || '—'}</div>
+            <div style="font-size:18px;font-weight:600">Cross-Sectional Standouts</div>
+            <div style="color:var(--text-secondary);font-size:13px">Rank strongly vs peers but not already in today's actions · snapshot ${fusion.snapshot_date || '—'}</div>
         </div>
-        <div class="glass" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-            ${countPills || '<span style="color:var(--text-secondary)">No tiered picks in latest snapshot</span>'}
-            <span style="margin-left:auto;font-size:12px;color:var(--text-secondary)">
-                abs ≥ ${fnum(fusion.absolute_threshold)} · rank ≥ ${pctOrDash(fusion.rank_threshold)}
-            </span>
+        ${hasStandouts ? `
+        <div class="glass" style="padding:10px 16px;margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <span style="font-size:12px;color:var(--text-secondary)">Names the cross-sectional model ranks that aren't in the actions above. Overlapping picks already show their rank inline (🏅 X-rank).</span>
+            <span style="margin-left:auto;font-size:12px;color:var(--text-secondary)">${thresholdLine}</span>
         </div>
         ${tierTables}${promoTable}
         <p style="color:var(--text-secondary);font-size:12px;margin:-4px 0 18px">
-            <strong>Fusion</strong> combines each name's absolute composite score with its
-            <em>cross-sectional rank</em> vs the scanned universe. A name clears a tier when it passes
-            the absolute gate, the rank gate, or both. Watchlist promotions rank strongly relative to
-            peers even when the absolute composite is thin. Not financial advice.
-        </p>`;
+            <strong>Cross-sectional rank</strong> measures how a name scores <em>relative to the scanned universe</em>.
+            These cleared the rank gate (or the absolute gate) without making today's action list — watch candidates
+            that lead their peers. Not financial advice.
+        </p>` : `
+        <div class="glass" style="padding:12px 16px;margin-bottom:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+            <span style="color:var(--positive, #22c55e)">✓</span>
+            <span style="font-size:13px;color:var(--text-secondary)">The cross-sectional model agrees with today's actions — every ranked name is already shown above (with its 🏅 X-rank). ${thresholdLine}.</span>
+        </div>`}`;
     }
 
     return `
@@ -1248,14 +1278,6 @@ Router.register('/daily', async () => {
             <div class="card-header"><div class="card-title">Stocks Scanned</div></div>
             <div class="card-value neutral">${scan.stocks_scanned || '—'}</div>
             <div class="card-subtitle">${timeSince(scan.scanned_at)}</div>
-        </div>
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Top Pick</div>
-                ${scan.top_score ? `<div class="score-ring success" style="--score:${Math.round(scan.top_score)};--size:48px"><span>${scan.top_score.toFixed(0)}</span></div>` : ''}
-            </div>
-            <div class="card-value neutral">${scan.top_pick || '—'}</div>
-            <div class="card-subtitle">Highest composite score today</div>
         </div>
     </div>
 

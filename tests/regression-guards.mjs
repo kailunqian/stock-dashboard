@@ -177,9 +177,9 @@ console.log('');
     const app = read('js/app.js');
     const errs = [];
 
-    // Daily: Buy-Tier Fusion panel (Phase J5 daily_fusion_summary).
-    if (!/data\.fusion\b/.test(app) || !/Buy-Tier Fusion/.test(app)) {
-        errs.push('Daily Buy-Tier Fusion panel missing (expects data.fusion + "Buy-Tier Fusion")');
+    // Daily: cross-sectional fusion folded into actions + standouts (Phase J5).
+    if (!/data\.fusion\b/.test(app) || !/Cross-Sectional Standouts/.test(app)) {
+        errs.push('Daily fusion surface missing (expects data.fusion + "Cross-Sectional Standouts")');
     }
     // System: ML buy-path health tile (system.ml_health).
     if (!/data\.ml_health\b/.test(app) || !/ML Buy-Path Health/.test(app)) {

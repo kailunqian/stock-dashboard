@@ -282,31 +282,61 @@ async function main() {
         return h;
     };
 
-    // 1) Daily — Buy-Tier Fusion panel renders from data.fusion
+    // 1) Daily — Cross-Sectional Standouts (deduped fusion) + inline X-rank
     try {
         API.daily = async () => dailyData();
         API.macro = async () => ({ enabled: false, themes: [] });
         const html = await handler('/daily')();
-        const a = assertIncludes('daily: fusion panel heading', html, 'Buy-Tier Fusion');
-        const b = assertIncludes('daily: fusion tier table', html, 'Strong Buy');
-        const c = assertIncludes('daily: fusion promotion row', html, 'AMD');
-        const d = assertIncludes('daily: fusion symbol row', html, 'NVDA');
-        if (a && b && c && d) ok('daily: Buy-Tier Fusion panel renders tiers + promotions from data.fusion');
+        const a = assertIncludes('daily: standouts heading', html, 'Cross-Sectional Standouts');
+        const b = assertIncludes('daily: action tier label', html, 'Strong Buy');
+        // AMD is a watchlist promotion NOT in today's actions → shows as a standout.
+        const c = assertIncludes('daily: standout (promotion not in actions)', html, 'AMD');
+        // NVDA is both an action pick and ranked by fusion → its cross-sectional
+        // rank is folded inline onto the action row (deduped, not relisted).
+        const d = assertIncludes('daily: action symbol row', html, 'NVDA');
+        const g = assertIncludes('daily: inline cross-sectional rank on action row', html, 'X-rank 95%');
+        if (a && b && c && d && g) ok('daily: fusion deduped — inline 🏅 X-rank on actions + standouts list names not in actions');
         // Decluttering (2026-06-02): ML Activity panel + ML Model KPI card were
         // relocated/removed; assert they no longer appear on the Daily tab even
         // though daily_ml_activity is still present in the payload.
         const e = assertExcludes('daily: ML Activity panel relocated to System', html, 'ML Activity (last 24h)');
         const f = assertExcludes('daily: ML Model KPI card removed', html, '>ML Model<');
-        if (e && f) ok('daily: ML-ops cruft (ML Activity panel + ML Model card) removed from Daily');
+        const h = assertExcludes('daily: redundant Top Pick KPI card removed', html, '>Top Pick<');
+        if (e && f && h) ok('daily: ML-ops cruft + redundant Top Pick card removed from Daily');
     } catch (e) { fail('daily render', e.stack || String(e)); }
+
+    // 1a) Daily — when every ranked name is already an action, standouts
+    // collapse to a single "agrees" note instead of relisting the same picks.
+    try {
+        API.daily = async () => dailyData({
+            fusion: {
+                available: true,
+                snapshot_date: '2026-06-04',
+                absolute_threshold: 75,
+                rank_threshold: 0.9,
+                tier_counts: { 'Strong Buy': 1 },
+                tiers: {
+                    'Strong Buy': [
+                        { symbol: 'NVDA', composite_score: 88, cross_sectional_rank: 0.95, in_focused_universe: true, in_sp500: true, abs_pass: true, rank_pass: true },
+                    ],
+                },
+                watchlist_promotions: [],
+            },
+        });
+        API.macro = async () => ({ enabled: false, themes: [] });
+        const html = await handler('/daily')();
+        const a = assertIncludes('daily: standouts agree note', html, 'cross-sectional model agrees');
+        const b = assertExcludes('daily: no standout tier table when all overlap', html, '⭐ Watchlist Promotion');
+        if (a && b) ok('daily: standouts collapse to an "agrees" note when fusion fully overlaps the actions');
+    } catch (e) { fail('daily render (fusion fully overlaps)', e.stack || String(e)); }
 
     // 1b) Daily — fusion hidden when unavailable (graceful empty state)
     try {
         API.daily = async () => dailyData({ fusion: { available: false } });
         API.macro = async () => ({ enabled: false, themes: [] });
         const html = await handler('/daily')();
-        if (assertExcludes('daily: fusion hidden when unavailable', html, 'Buy-Tier Fusion')) {
-            ok('daily: fusion panel omitted when fusion.available is false');
+        if (assertExcludes('daily: fusion hidden when unavailable', html, 'Cross-Sectional Standouts')) {
+            ok('daily: fusion surface omitted when fusion.available is false');
         }
     } catch (e) { fail('daily render (no fusion)', e.stack || String(e)); }
 
