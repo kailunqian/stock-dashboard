@@ -421,6 +421,57 @@ async function main() {
         if (d && e && f && g) ok('performance: ML Model Performance card surfaces model_metrics.has_* feature sources + extra metrics');
     } catch (e) { fail('performance render', e.stack || String(e)); }
 
+    // 3b) Performance — 90d headline KPI + Strategy P&L card render
+    try {
+        API.performance = async () => performanceData({
+            scorecard: { scorecards: {
+                '7d': { total_picks: 5, hit_rate: 0.6, winners: 3, losers: 2, avg_return: 0.02, cumulative_return: 0.1 },
+                '30d': { total_picks: 20, hit_rate: 0.55, winners: 11, losers: 9, avg_return: 0.015, cumulative_return: 0.3 },
+                '90d': { total_picks: 55, hit_rate: 0.58, winners: 32, losers: 23, avg_return: 0.021, cumulative_return: 1.1 },
+                all: { total_picks: 120, hit_rate: 0.56, winners: 67, losers: 53, avg_return: 0.018, cumulative_return: 2.2 },
+            } },
+            strategy_pnl: {
+                overall_count: 12, overall_wins: 8, overall_win_rate: 66.7,
+                strategies: [
+                    { strategy: 'assumed_recommendation', count: 9, wins: 6, win_rate: 66.7, avg_return: 3.2, total_pnl: 145.5 },
+                    { strategy: 'fast_swing', count: 3, wins: 2, win_rate: 66.7, avg_return: 1.1, total_pnl: 22.3 },
+                ],
+            },
+        });
+        const html = await handler('/performance')();
+        const a = assertIncludes('performance: 90d KPI label', html, 'Last 90 days');
+        if (a) ok('performance: headline KPI strip includes a 90-day track-record card');
+        const b = assertIncludes('performance: strategy P&L heading', html, 'Strategy P&amp;L');
+        const c = assertIncludes('performance: strategy P&L all-time win rate', html, '67%');
+        const d = assertIncludes('performance: strategy P&L row (assumed_recommendation)', html, 'assumed_recommendation');
+        const e = assertIncludes('performance: strategy P&L total pnl', html, '$145.50');
+        if (b && c && d && e) ok('performance: Strategy P&L card renders per-strategy trade count/win-rate/avg-return/total-P&L from data.strategy_pnl');
+    } catch (e) { fail('performance render (strategy pnl + 90d)', e.stack || String(e)); }
+
+    // 3c) Performance — weekly walk-forward edge is a visible chart (not a
+    // nested collapsed table), lazily drawn when advanced metrics opens
+    try {
+        API.performance = async () => performanceData({
+            walk_forward: {
+                status: 'ok',
+                overall: { edge: 0.12, high_score_hit_rate: 0.62, low_score_hit_rate: 0.5, total_predictions: 300, high_outperforms: true },
+                windows: [
+                    { week: '2026-W20', high_hit_rate: 0.6, low_hit_rate: 0.5, high_score_count: 10, low_score_count: 8 },
+                    { week: '2026-W21', high_hit_rate: 0.65, low_hit_rate: 0.48, high_score_count: 12, low_score_count: 9 },
+                ],
+            },
+        });
+        const html = await handler('/performance')();
+        const a = assertIncludes('walk-forward: weekly chart canvas present', html, 'id="wf-weekly-chart"');
+        const b = assertIncludes('walk-forward: outer advanced-metrics details has stable id', html, 'id="advanced-metrics-details"');
+        const c = assertIncludes('walk-forward: raw numbers still available as a table', html, 'Weekly breakdown (2 weeks)');
+        const d = JSON.stringify(window.__wfWeeklyWindows) === JSON.stringify([
+            { week: '2026-W20', high_hit_rate: 0.6, low_hit_rate: 0.5, high_score_count: 10, low_score_count: 8 },
+            { week: '2026-W21', high_hit_rate: 0.65, low_hit_rate: 0.48, high_score_count: 12, low_score_count: 9 },
+        ]) ? ok('walk-forward: weekly windows stashed on window for the lazy chart hook') : fail('walk-forward: window.__wfWeeklyWindows', JSON.stringify(window.__wfWeeklyWindows));
+        if (a && b && c) ok('performance: weekly walk-forward edge renders as a visible chart, not a nested collapsed table');
+    } catch (e) { fail('performance render (walk-forward chart)', e.stack || String(e)); }
+
     // 4) Pipeline — analysis flow renders from API.daily().pipeline
     try {
         API.daily = async () => pipelineData();

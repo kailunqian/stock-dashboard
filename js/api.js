@@ -36,10 +36,14 @@ const API = {
     },
 
     async fetch(path, opts = {}) {
+        const mergedHeaders = {
+            ...this.headers(),
+            ...(opts.headers || {}),
+        };
         const resp = await fetch(`${this.base}/api/${path}`, {
             credentials: 'include',
-            headers: this.headers(),
             ...opts,
+            headers: mergedHeaders,
         });
         if (resp.status === 401) {
             this._handle401();
@@ -452,6 +456,7 @@ const API = {
         });
     },
     diagnostics() { return this.fetch('dashboard/diagnostics'); },
+    leagueDiagnostics() { return this.fetch('dashboard/admin/league'); },
     v2ShadowSummary(days = 7) {
         return this.fetch(`dashboard/admin/v2-shadow-summary?days=${days}`);
     },

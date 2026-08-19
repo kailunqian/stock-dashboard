@@ -298,6 +298,19 @@ const Router = {
                             });
                         });
                     }
+                    // The weekly walk-forward edge chart lives inside the
+                    // "advanced metrics" <details>, which is collapsed (0
+                    // width) on load — Chart.js can't size a canvas inside a
+                    // hidden container, so build it lazily the first time the
+                    // section is opened rather than eagerly at page render.
+                    const advDetails = document.getElementById('advanced-metrics-details');
+                    if (advDetails) {
+                        advDetails.addEventListener('toggle', function onFirstOpen() {
+                            if (!advDetails.open) return;
+                            ensureChartJs().then(renderWalkForwardChart);
+                            advDetails.removeEventListener('toggle', onFirstOpen);
+                        });
+                    }
                 }
             } catch (e) {
                 main.innerHTML = `<div class="card" style="margin:40px auto;max-width:500px;text-align:center">
@@ -1491,7 +1504,7 @@ Router.register('/performance', async () => {
         </div>`;
     }
 
-    const hasScorecardData = ['7d', '30d', 'all'].some(k => sc[k] && sc[k].total_picks > 0);
+    const hasScorecardData = ['7d', '30d', '90d', 'all'].some(k => sc[k] && sc[k].total_picks > 0);
 
     // ML Model Performance section
     let modelHtml = '';
@@ -1567,8 +1580,12 @@ Router.register('/performance', async () => {
             </div>
             <div style="font-size:13px;color:var(--text-secondary)">${outperforms}</div>
             ${wf.windows && wf.windows.length > 0 ? `
+            <div class="chart-wrapper" style="margin-top:14px">
+                <h3 class="chart-title">Weekly Edge Trend (High − Low Score Hit Rate)</h3>
+                <div class="chart-container"><canvas id="wf-weekly-chart"></canvas></div>
+            </div>
             <details style="margin-top:8px">
-                <summary style="cursor:pointer;font-size:13px;color:var(--accent-blue)">Weekly breakdown (${wf.windows.length} weeks)</summary>
+                <summary style="cursor:pointer;font-size:13px;color:var(--accent-blue)">Weekly breakdown (${wf.windows.length} weeks) — table</summary>
                 <div class="table-container" style="margin-top:8px">
                     <table>
                         <thead><tr><th>Week</th><th>High Score</th><th>Low Score</th><th>Edge</th></tr></thead>
@@ -1587,6 +1604,12 @@ Router.register('/performance', async () => {
                 </div>
             </details>` : ''}
         </div>`;
+        // Weekly windows are already available synchronously (no separate
+        // fetch, unlike the main /performance charts) — stash them for the
+        // post-render Chart.js hook in the router (see path === '/performance').
+        window.__wfWeeklyWindows = wf.windows;
+    } else {
+        window.__wfWeeklyWindows = null;
     }
 
     // Signal accuracy section
@@ -1791,6 +1814,42 @@ Router.register('/performance', async () => {
         </div>`;
     }
 
+    // Strategy P&L — real closed-trade win rate/avg return/total P&L per
+    // strategy (all-time), sourced from the same computation as the email
+    // portfolio digest. Distinct from the signal-classifier leaderboard
+    // above: this is realized outcomes on actual virtual buys/sells, not
+    // raw 7d/30d returns on every signal fired.
+    const strategyPnl = data.strategy_pnl;
+    let strategyPnlHtml = '';
+    if (strategyPnl && strategyPnl.strategies && strategyPnl.strategies.length > 0) {
+        const overallLine = strategyPnl.overall_win_rate != null
+            ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">All-time win rate: <strong class="${strategyPnl.overall_win_rate >= 50 ? 'positive' : 'negative'}">${strategyPnl.overall_win_rate.toFixed(0)}%</strong> (${strategyPnl.overall_wins}/${strategyPnl.overall_count} closed trades)</div>`
+            : '';
+        strategyPnlHtml = `
+        <div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Strategy P&amp;L (closed trades, all-time)</div>
+        ${overallLine}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Strategy</th><th>Trades</th><th>Win Rate</th>
+                        <th>Avg Return</th><th>Total P&amp;L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${strategyPnl.strategies.map(s => `
+                    <tr>
+                        <td><strong>${s.strategy}</strong></td>
+                        <td>${s.count}</td>
+                        <td class="${s.win_rate != null && s.win_rate >= 50 ? 'positive' : 'negative'}">${s.win_rate != null ? s.win_rate.toFixed(0) + '%' : '—'} ${s.win_rate != null ? `(${s.wins}/${s.count})` : ''}</td>
+                        <td class="${pctClass(s.avg_return || 0)}">${s.avg_return != null ? pctSign(s.avg_return) : '—'}</td>
+                        <td class="${pctClass(s.total_pnl || 0)}">${s.total_pnl != null ? (s.total_pnl >= 0 ? '+' : '') + '$' + s.total_pnl.toFixed(2) : '—'}</td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        </div>`;
+    }
+
     // ── Headline KPI strip (the answer to "did the picks work?") ────────
     function headlineKpiCard(label, c) {
         if (!c || !c.total_picks) {
@@ -1819,6 +1878,7 @@ Router.register('/performance', async () => {
     <div class="card-grid" style="margin-bottom:18px">
         ${headlineKpiCard('Last 7 days',  sc['7d'])}
         ${headlineKpiCard('Last 30 days', sc['30d'])}
+        ${headlineKpiCard('Last 90 days', sc['90d'])}
         ${headlineKpiCard('All time',     sc.all)}
     </div>`;
 
@@ -1932,6 +1992,117 @@ Router.register('/performance', async () => {
         </div>`;
     }
 
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[c]));
+    const fmtMoney = (v) => typeof v === 'number' ? `$${v.toFixed(2)}` : '—';
+    const fmtSignedPct = (v) => typeof v === 'number' ? `<span class="${pctClass(v)}">${pctSign(v)}</span>` : '—';
+    const virtualPortfolio = Array.isArray(data.virtual_portfolio) ? data.virtual_portfolio : [];
+    const positionMonitor = Array.isArray(data.position_monitor) ? data.position_monitor : [];
+    const entryOpportunities = Array.isArray(data.entry_opportunities) ? data.entry_opportunities : [];
+    let portfolioOpsHtml = '';
+    if (virtualPortfolio.length || positionMonitor.length || entryOpportunities.length) {
+        const openVirtual = virtualPortfolio.filter(v => v.status === 'open');
+        const closedVirtual = virtualPortfolio.filter(v => v.status === 'closed');
+        const avg = (rows, key) => rows.length
+            ? rows.reduce((sum, row) => sum + (typeof row[key] === 'number' ? row[key] : 0), 0) / rows.length
+            : null;
+        const openAvgReturn = avg(openVirtual, 'return_pct');
+        const closedAvgReturn = avg(closedVirtual, 'return_pct');
+        const freshestMark = _maxIso(positionMonitor, 'snapshot_at');
+        const virtualRows = [...openVirtual, ...closedVirtual]
+            .slice()
+            .sort((a, b) => String(b.entered_at || '').localeCompare(String(a.entered_at || '')))
+            .slice(0, 12)
+            .map(row => `
+                <tr>
+                    <td><a href="#/stock/${esc(row.symbol)}" style="color:var(--accent-blue)">${esc(row.symbol)}</a></td>
+                    <td>${esc(String(row.strategy || '—').replace(/_/g, ' '))}</td>
+                    <td><span class="pill pill-${row.status === 'open' ? 'green' : 'blue'}">${esc(row.status)}</span></td>
+                    <td>${fmtMoney(row.entry_price)}</td>
+                    <td>${fmtMoney(row.current_price)}</td>
+                    <td>${fmtSignedPct(row.return_pct)}</td>
+                    <td>${row.entered_at ? timeSince(row.entered_at) : '—'}</td>
+                    <td>${row.exit_reason ? esc(row.exit_reason) : '—'}</td>
+                </tr>`).join('');
+        const markRows = positionMonitor
+            .slice()
+            .sort((a, b) => String(b.snapshot_at || '').localeCompare(String(a.snapshot_at || '')))
+            .slice(0, 12)
+            .map(row => `
+                <tr>
+                    <td><a href="#/stock/${esc(row.symbol)}" style="color:var(--accent-blue)">${esc(row.symbol)}</a></td>
+                    <td>${esc(row.account || '—')}</td>
+                    <td>${typeof row.shares === 'number' ? row.shares : '—'} @ ${fmtMoney(row.avg_cost)}</td>
+                    <td>${fmtMoney(row.current_price)}</td>
+                    <td>${typeof row.unrealized_gain === 'number' ? `<span class="${pctClass(row.unrealized_gain)}">${row.unrealized_gain >= 0 ? '+' : ''}$${Math.abs(row.unrealized_gain).toFixed(2)}</span>` : '—'} / ${fmtSignedPct(row.unrealized_pct)}</td>
+                    <td>${esc(row.recommended_action || row.lifecycle_state || '—')}</td>
+                    <td>${freshnessBadge(row.snapshot_at, { label: 'Mark', staleAfterHrs: 8 }) || '—'}</td>
+                </tr>`).join('');
+        const entryRows = entryOpportunities
+            .slice()
+            .sort((a, b) => String(b.evaluated_at || '').localeCompare(String(a.evaluated_at || '')))
+            .slice(0, 12)
+            .map(row => `
+                <tr>
+                    <td><a href="#/stock/${esc(row.symbol)}" style="color:var(--accent-blue)">${esc(row.symbol)}</a></td>
+                    <td><span class="pill pill-${/ready|buy|open/i.test(row.state || '') ? 'green' : /miss|reject|wait|watch/i.test(row.state || '') ? 'yellow' : 'blue'}">${esc(row.state || '—')}</span></td>
+                    <td>${fmtMoney(row.current_price)}</td>
+                    <td>${fmtMoney(row.trigger_price)}</td>
+                    <td>${typeof row.reward_risk === 'number' ? row.reward_risk.toFixed(2) : '—'}</td>
+                    <td>${typeof row.relative_volume === 'number' ? `${row.relative_volume.toFixed(2)}×` : '—'}</td>
+                    <td>${row.evaluated_at ? timeSince(row.evaluated_at) : '—'}</td>
+                    <td style="font-size:12px;color:var(--text-secondary)">${esc(row.reason || row.miss_category || '—')}</td>
+                </tr>`).join('');
+
+        portfolioOpsHtml = `
+        <div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Continuous recommendation portfolio</div>
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-title">Open Virtual Lots</div>
+                <div class="card-value ${openVirtual.length ? 'positive' : 'neutral'}">${openVirtual.length}</div>
+                <div class="card-subtitle">${openAvgReturn != null ? `Avg open return ${pctSign(openAvgReturn)}` : 'Awaiting marks'}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Closed Virtual Lots</div>
+                <div class="card-value">${closedVirtual.length}</div>
+                <div class="card-subtitle">${closedAvgReturn != null ? `Avg closed return ${pctSign(closedAvgReturn)}` : 'No closed lots yet'}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Live Position Marks</div>
+                <div class="card-value">${positionMonitor.length}</div>
+                <div class="card-subtitle">${freshestMark ? `Latest ${timeSince(freshestMark)}` : 'No live marks yet'}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Entry Opportunities</div>
+                <div class="card-value">${entryOpportunities.length}</div>
+                <div class="card-subtitle">Latest trigger / anti-chase states</div>
+            </div>
+        </div>
+        ${virtualPortfolio.length ? `
+        <div class="table-container" style="margin-top:16px">
+            <div class="table-header">Virtual Portfolio Lots</div>
+            <table>
+                <thead><tr><th>Symbol</th><th>Strategy</th><th>Status</th><th>Entry</th><th>Mark</th><th>Return</th><th>Entered</th><th>Exit</th></tr></thead>
+                <tbody>${virtualRows}</tbody>
+            </table>
+        </div>` : ''}
+        ${positionMonitor.length ? `
+        <div class="table-container" style="margin-top:16px">
+            <div class="table-header">Open Position Monitor</div>
+            <table>
+                <thead><tr><th>Symbol</th><th>Account</th><th>Position</th><th>Mark</th><th>Unrealized</th><th>Action</th><th>Freshness</th></tr></thead>
+                <tbody>${markRows}</tbody>
+            </table>
+        </div>` : ''}
+        ${entryOpportunities.length ? `
+        <div class="table-container" style="margin-top:16px">
+            <div class="table-header">Entry Opportunity Monitor</div>
+            <table>
+                <thead><tr><th>Symbol</th><th>State</th><th>Current</th><th>Trigger</th><th>R/R</th><th>Rel Vol</th><th>Evaluated</th><th>Reason</th></tr></thead>
+                <tbody>${entryRows}</tbody>
+            </table>
+        </div>` : ''}`;
+    }
+
     return `
     <div class="page-title">Performance</div>
     ${headlineKpiHtml}
@@ -1944,7 +2115,7 @@ Router.register('/performance', async () => {
             <button data-days="365">1 Year</button>
         </div>
     </div>
-    <details style="margin-top:24px;border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card-bg)">
+    <details id="advanced-metrics-details" style="margin-top:24px;border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--card-bg)">
         <summary style="cursor:pointer;font-size:14px;color:var(--text-secondary)">▸ Show advanced metrics (ML model, calibration, strategies, walk-forward)</summary>
         <div style="margin-top:14px">
             ${modelHtml || scorerHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin-bottom:8px">ML Model Metrics</div>' : ''}
@@ -1957,11 +2128,14 @@ Router.register('/performance', async () => {
             ${signalAccuracyHtml}
             ${convictionHtml}
             ${strategyHtml}
+            ${strategyPnlHtml}
+            ${portfolioOpsHtml}
             ${hasScorecardData || emptyHtml ? '<div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Prediction Scorecard</div>' : ''}
             <div class="card-grid">
                 ${hasScorecardData ? `
                     ${scorecardCard('7d', sc['7d'])}
                     ${scorecardCard('30d', sc['30d'])}
+                    ${scorecardCard('90d', sc['90d'])}
                     ${scorecardCard('all', sc.all)}
                     ${calibrationHtml}
                 ` : emptyHtml}
@@ -2013,6 +2187,46 @@ function createChartCanvas(id, title, parent) {
     wrapper.innerHTML = `<h3 class="chart-title">${title}</h3><div class="chart-container"><canvas id="${id}"></canvas></div>`;
     parent.appendChild(wrapper);
     return document.getElementById(id);
+}
+
+// Weekly walk-forward edge (High − Low score hit rate) — data is already
+// present synchronously on the page (window.__wfWeeklyWindows, set while
+// building the Performance page HTML), so this just draws into the canvas
+// once the "advanced metrics" <details> is opened (see router post-render).
+function renderWalkForwardChart() {
+    const canvas = document.getElementById('wf-weekly-chart');
+    const windows = window.__wfWeeklyWindows;
+    if (!canvas || !windows || windows.length === 0) return;
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+
+    const weeks = windows.slice(-8);
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: weeks.map(w => w.week),
+            datasets: [
+                {
+                    label: 'High Score Hit Rate', data: weeks.map(w => w.high_hit_rate != null ? w.high_hit_rate * 100 : null),
+                    borderColor: '#3fb950', backgroundColor: 'rgba(63,185,80,0.1)', fill: false, tension: 0.3, spanGaps: true,
+                },
+                {
+                    label: 'Low Score Hit Rate', data: weeks.map(w => w.low_hit_rate != null ? w.low_hit_rate * 100 : null),
+                    borderColor: '#f85149', backgroundColor: 'rgba(248,81,73,0.1)', fill: false, tension: 0.3, spanGaps: true,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
+            scales: {
+                x: { type: 'category', grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b949e', maxRotation: 45 } },
+                y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#8b949e', callback: v => v + '%' } },
+            },
+            plugins: { legend: { labels: { color: '#e6edf3' } } },
+        },
+    });
 }
 
 function renderPerformanceCharts(metrics) {
@@ -2088,11 +2302,15 @@ function renderPerformanceCharts(metrics) {
 
     // Chart 4: Equal-weight portfolio average pick return (rolling 30 days).
     // Backend metric `portfolio_cumulative_30d` is the AVERAGE 7d return of
-    // picks made in the trailing 30 days — i.e. the equal-weight portfolio
-    // return. Previously labeled "Cumulative" but stored sum-of-returns,
-    // which produced nonsense like 140%.
+    // picks made in the trailing 30 days (a fixed 30d rolling window,
+    // computed daily by the backend job) — i.e. the equal-weight portfolio
+    // return. This is independent of the chart-timeframe range selector
+    // above (30/90/365 days), which only controls how much history of this
+    // daily rolling-average series is plotted, not the window width itself
+    // — so the title says "30d Rolling Window" rather than "Last 30 Days"
+    // to avoid implying it tracks the selected range.
     if (metrics.portfolio_cumulative_30d) {
-        const canvas4 = createChartCanvas('cumulative-chart', 'Avg 7d Pick Return — Last 30 Days (%)', chartSection);
+        const canvas4 = createChartCanvas('cumulative-chart', 'Avg 7d Pick Return (30d Rolling Window) (%)', chartSection);
         new Chart(canvas4, { type: 'line', data: {
             datasets: [{
                 label: 'Avg Return', data: metrics.portfolio_cumulative_30d.map(d => ({ x: d.date, y: d.value })),
@@ -2774,9 +2992,10 @@ Router.register('/system', async () => {
 
 // ── Diagnostics Page — Near-miss + gate failure analysis (admin) ────
 Router.register('/diagnostics', async () => {
-    const [data, v2] = await Promise.all([
+    const [data, v2, league] = await Promise.all([
         API.diagnostics(),
         API.v2ShadowSummary(7).catch(() => null),
+        API.leagueDiagnostics().catch(() => null),
     ]);
     if (!data) return '<p>Failed to load</p>';
     if (data.error) return `<p>Error: ${String(data.error)}</p>`;
@@ -2893,6 +3112,84 @@ Router.register('/diagnostics', async () => {
             <p style="color:var(--text-secondary)">Error loading v2 shadow data: ${escape(String(v2.error))}</p>`;
     }
 
+    let leagueSection = '';
+    if (league && !league.error) {
+        const health = league.health || {};
+        const runs = league.latest_runs || {};
+        const candidateRows = (league.candidate_statuses || []).slice(0, 12).map(row => `
+            <tr>
+                <td>${escape(row.name || row.candidate_key)}</td>
+                <td>${escape(row.status || '—')}</td>
+                <td>${row.horizon_days != null ? row.horizon_days : '—'}d</td>
+                <td>${row.affects_real_alerts === false ? 'No' : '—'}</td>
+            </tr>`).join('');
+        const runRows = Object.entries(runs).map(([name, run]) => `
+            <tr>
+                <td>${escape(name)}</td>
+                <td>${run.runs_24h ?? 0}</td>
+                <td>${run.failed_24h ?? 0}</td>
+                <td>${escape(run.last_status || '—')}</td>
+                <td>${run.last_timestamp ? timeSince(run.last_timestamp) : '—'}</td>
+            </tr>`).join('');
+        const standings = Array.isArray(league.latest_standings && league.latest_standings.standings)
+            ? league.latest_standings.standings
+            : [];
+        const standingsRows = standings.slice(0, 10).map(row => `
+            <tr>
+                <td>${escape(row.name || row.candidate_key || row.strategy_name || '—')}</td>
+                <td>${row.profit_risk_rank != null ? row.profit_risk_rank : (row.primary_rank != null ? row.primary_rank : '—')}</td>
+                <td>${row.uncertainty_aware_secondary_rating != null ? row.uncertainty_aware_secondary_rating : (row.secondary_rating != null ? row.secondary_rating : '—')}</td>
+                <td>${row.matured_count ?? row.sample_size ?? row.n ?? '—'}</td>
+            </tr>`).join('');
+        leagueSection = `
+        <div class="page-title" style="margin-top:32px">Model League (shadow only)</div>
+        <p style="color:var(--text-secondary);margin-top:-8px;margin-bottom:16px">
+            The league continuously scores alternative decision rules against matured outcomes, but
+            <strong>never affects real alerts</strong> directly.
+        </p>
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-title">Candidates</div>
+                <div class="card-value">${health.candidate_count || 0}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Latest Cohort Snapshot</div>
+                <div class="card-value">${health.latest_snapshot_at ? timeSince(health.latest_snapshot_at) : '—'}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Unavailable Outcomes</div>
+                <div class="card-value ${health.unavailable_outcome_count_returned ? 'negative' : 'positive'}">${health.unavailable_outcome_count_returned || 0}</div>
+            </div>
+        </div>
+        ${runRows ? `
+        <div class="table-container" style="margin-top:24px">
+            <div class="table-header">League Timer Health</div>
+            <table>
+                <thead><tr><th>Timer</th><th>Runs (24h)</th><th>Failed</th><th>Last Status</th><th>Last Run</th></tr></thead>
+                <tbody>${runRows}</tbody>
+            </table>
+        </div>` : ''}
+        ${candidateRows ? `
+        <div class="table-container" style="margin-top:24px">
+            <div class="table-header">Candidate Statuses</div>
+            <table>
+                <thead><tr><th>Name</th><th>Status</th><th>Horizon</th><th>Affects real alerts?</th></tr></thead>
+                <tbody>${candidateRows}</tbody>
+            </table>
+        </div>` : ''}
+        ${standingsRows ? `
+        <div class="table-container" style="margin-top:24px">
+            <div class="table-header">Latest Exported Standings</div>
+            <table>
+                <thead><tr><th>Candidate</th><th>Primary Rank</th><th>Secondary Rating</th><th>Samples</th></tr></thead>
+                <tbody>${standingsRows}</tbody>
+            </table>
+        </div>` : ''}`;
+    } else if (league && league.error) {
+        leagueSection = `<div class="page-title" style="margin-top:32px">Model League (shadow only)</div>
+            <p style="color:var(--text-secondary)">Error loading league diagnostics: ${escape(String(league.error))}</p>`;
+    }
+
     return `
     <div class="page-title">Diagnostics — Near-Miss Analysis</div>
     <p style="color:var(--text-secondary);margin-top:-8px;margin-bottom:16px">
@@ -2940,7 +3237,8 @@ Router.register('/diagnostics', async () => {
             <tbody>${nmRows}</tbody>
         </table>
     </div>
-    ${v2Section}`;
+    ${v2Section}
+    ${leagueSection}`;
 });
 
 // ── Billing Page (Phase 13c) ─────────────────────────────────────────
@@ -3015,7 +3313,7 @@ Router.register('/billing', async () => {
     }
 
     const me = await API.checkAuth();
-    const isPro = (me && me.tier === 'pro');
+    const isPro = !!(me && (me.is_pro || me.tier === 'grandfathered'));
 
     return `
     <div class="page-eyebrow">Billing</div>

@@ -12,15 +12,16 @@ Read-only stock analysis dashboard powered by AI/ML — displays results from sc
 
 | Page | Description |
 |------|-------------|
-| **Daily** | Today's scan results: stocks scanned, buy signals, top picks with scores/targets/signals, training status card (budget tier & headroom), ML model accuracy |
-| **Performance** | ML model metrics (accuracy, AUC-ROC, scorer hit rate, training samples), prediction scorecard (7d/30d/all), confidence calibration |
-| **Budget** | Azure cost tracking: current spend vs $200 budget, month-end forecast, cost breakdown by service |
-| **System** | Function health status (daily_scan, daily_retrain, hourly_monitor, outcome_tracker, self_test, cost_check), ML model info (version, features, accuracy, data sources), self-test results |
+| **Daily** | Today's scan results: market regime, action buckets (High Conviction / Buy / Watch / Trim), top picks, and cross-sectional standouts |
+| **Performance** | Prediction scorecard (7d/30d/all), confidence calibration, strategy leaderboard, and continuous recommendation portfolio / entry-monitor views |
+| **Budget** | Admin-only Azure cost tracking: current spend vs $200 budget, forecast, and cost breakdown by service |
+| **System** | Admin-only function health, incidents, scheduled jobs, ML buy-path health, ML activity, and model/self-test status |
+| **Diagnostics** | Admin-only near-miss analysis, v2 shadow scoring diagnostics, and Model League shadow-health views |
 | **Stock Detail** | Per-stock cached LLM signal, social sentiment, scan entry (read-only, no live scans) |
 
 ### Authentication
 
-Magic-link email login — no passwords. Azure Communication Services sends one-click login links to authorized emails. Token-based auth with Bearer headers on all API calls.
+Magic-link email login — no passwords. The dashboard exchanges `#/verify?token=...` links for a `dash_jwt` auth cookie and also stores the returned bearer token as a fallback when third-party cookies are blocked.
 
 - Rate limited: 3 login attempts per 15 min, 60 data requests per min (per IP)
 - Unregistered emails never trigger sends
@@ -32,11 +33,11 @@ Magic-link email login — no passwords. Azure Communication Services sends one-
 ┌────────────────────────┐      HTTPS/CORS       ┌───────────────────────────┐
 │   GitHub Pages         │ ◄────────────────────► │   Azure Functions (Py)    │
 │   (this repo)          │                        │   (private repo)          │
-│                        │  Bearer token auth     │                           │
-│  • Vanilla JS SPA      │ ──────────────────────►│  • 9 dashboard API routes │
-│  • Hash-based router   │                        │  • Magic-link auth verify │
-│  • Dark theme CSS      │  /api/dashboard/*      │  • Rate limiting          │
-│  • Read-only views     │ ◄────────────────────► │  • Self-healing retries   │
+│                        │  cookie + bearer auth │                           │
+│  • Vanilla JS SPA      │ ──────────────────────►│  • Dashboard/auth/        │
+│  • Hash-based router   │                        │    billing/cache APIs     │
+│  • Dark theme CSS      │  /api/dashboard/*      │  • Magic-link auth verify │
+│  • Read-only views     │ ◄────────────────────► │  • Rate limiting          │
 └────────────────────────┘                        └─────────┬─────────────────┘
                                                             │
                                                             ▼
@@ -56,14 +57,14 @@ This repo contains **only the frontend** (HTML/CSS/JS). All ML models, strategie
 ### Auth Flow
 
 ```
-Email → Azure Functions (send magic link) → User clicks link → Verify token → Redirect with session token → Bearer auth
+Email → Dashboard `#/verify?token=...` → `/api/auth/verify` → `dash_jwt` cookie (+ bearer fallback) → authenticated API calls
 ```
 
 ## Tech Stack
 
 - **Frontend:** Vanilla JS SPA with hash-based routing (no framework dependencies)
 - **Styling:** CSS custom properties dark theme (Linear/Vercel-inspired login, glassmorphism card, gradient accent, SVG icons)
-- **Backend:** Azure Functions Python v2 (9 dashboard API endpoints)
+- **Backend:** Azure Functions Python v2 (`/api/dashboard/*`, `/api/auth/*`, `/api/billing/*`, `/api/cache/*`)
 - **Auth:** Azure Communication Services (magic-link email)
 - **Data:** Azure Blob Storage (read-only)
 - **Hosting:** GitHub Pages
