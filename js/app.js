@@ -1820,11 +1820,19 @@ Router.register('/performance', async () => {
     // above: this is realized outcomes on actual virtual buys/sells, not
     // raw 7d/30d returns on every signal fired.
     const strategyPnl = data.strategy_pnl;
+    const strategyPnl30d = data.strategy_pnl_30d;
     let strategyPnlHtml = '';
     if (strategyPnl && strategyPnl.strategies && strategyPnl.strategies.length > 0) {
         const overallLine = strategyPnl.overall_win_rate != null
             ? `<div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">All-time win rate: <strong class="${strategyPnl.overall_win_rate >= 50 ? 'positive' : 'negative'}">${strategyPnl.overall_win_rate.toFixed(0)}%</strong> (${strategyPnl.overall_wins}/${strategyPnl.overall_count} closed trades)</div>`
             : '';
+        // Recent (last 30d) per-strategy lookup, alongside all-time — surfaces
+        // whether a strategy's trend is diverging from its cumulative record
+        // (mirrors the email digest's "Last 30d" column, #48).
+        const recentByStrategy = {};
+        if (strategyPnl30d && strategyPnl30d.strategies) {
+            strategyPnl30d.strategies.forEach(s => { recentByStrategy[s.strategy] = s; });
+        }
         strategyPnlHtml = `
         <div style="font-size:14px;color:var(--text-secondary);margin:16px 0 8px">Strategy P&amp;L (closed trades, all-time)</div>
         ${overallLine}
@@ -1833,18 +1841,25 @@ Router.register('/performance', async () => {
                 <thead>
                     <tr>
                         <th>Strategy</th><th>Trades</th><th>Win Rate</th>
-                        <th>Avg Return</th><th>Total P&amp;L</th>
+                        <th>Avg Return</th><th>Total P&amp;L</th><th>Last 30d</th>
                     </tr>
                 </thead>
                 <tbody>
-                    ${strategyPnl.strategies.map(s => `
+                    ${strategyPnl.strategies.map(s => {
+                        const recent = recentByStrategy[s.strategy];
+                        const recentCell = recent
+                            ? `${recent.count} trades, <span class="${recent.win_rate != null && recent.win_rate >= 50 ? 'positive' : 'negative'}">${recent.win_rate != null ? recent.win_rate.toFixed(0) + '%' : '—'} win</span>, <span class="${pctClass(recent.total_pnl || 0)}">${recent.total_pnl != null ? (recent.total_pnl >= 0 ? '+' : '') + '$' + recent.total_pnl.toFixed(2) : '—'}</span>`
+                            : '<span style="color:var(--text-secondary)">no closed trades</span>';
+                        return `
                     <tr>
                         <td><strong>${s.strategy}</strong></td>
                         <td>${s.count}</td>
                         <td class="${s.win_rate != null && s.win_rate >= 50 ? 'positive' : 'negative'}">${s.win_rate != null ? s.win_rate.toFixed(0) + '%' : '—'} ${s.win_rate != null ? `(${s.wins}/${s.count})` : ''}</td>
                         <td class="${pctClass(s.avg_return || 0)}">${s.avg_return != null ? pctSign(s.avg_return) : '—'}</td>
                         <td class="${pctClass(s.total_pnl || 0)}">${s.total_pnl != null ? (s.total_pnl >= 0 ? '+' : '') + '$' + s.total_pnl.toFixed(2) : '—'}</td>
-                    </tr>`).join('')}
+                        <td style="font-size:12px">${recentCell}</td>
+                    </tr>`;
+                    }).join('')}
                 </tbody>
             </table>
         </div>`;

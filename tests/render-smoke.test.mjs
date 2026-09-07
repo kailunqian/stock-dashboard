@@ -437,6 +437,12 @@ async function main() {
                     { strategy: 'fast_swing', count: 3, wins: 2, win_rate: 66.7, avg_return: 1.1, total_pnl: 22.3 },
                 ],
             },
+            strategy_pnl_30d: {
+                overall_count: 3, overall_wins: 1, overall_win_rate: 33.3,
+                strategies: [
+                    { strategy: 'fast_swing', count: 3, wins: 1, win_rate: 33.3, avg_return: -0.5, total_pnl: -12.4 },
+                ],
+            },
         });
         const html = await handler('/performance')();
         const a = assertIncludes('performance: 90d KPI label', html, 'Last 90 days');
@@ -446,6 +452,10 @@ async function main() {
         const d = assertIncludes('performance: strategy P&L row (assumed_recommendation)', html, 'assumed_recommendation');
         const e = assertIncludes('performance: strategy P&L total pnl', html, '$145.50');
         if (b && c && d && e) ok('performance: Strategy P&L card renders per-strategy trade count/win-rate/avg-return/total-P&L from data.strategy_pnl');
+        const f = assertIncludes('performance: strategy P&L Last 30d header', html, 'Last 30d');
+        const g = assertIncludes('performance: strategy P&L last-30d fast_swing pnl', html, '$-12.40');
+        const h = assertIncludes('performance: strategy P&L last-30d no-trades fallback', html, 'no closed trades');
+        if (f && g && h) ok('performance: Strategy P&L card shows a Last 30d column from data.strategy_pnl_30d, alongside a no-closed-trades fallback for strategies absent from the 30d window');
     } catch (e) { fail('performance render (strategy pnl + 90d)', e.stack || String(e)); }
 
     // 3c) Performance — weekly walk-forward edge is a visible chart (not a
